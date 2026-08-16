@@ -531,6 +531,8 @@ $script:pendingStart = $false    # 正在启动服务器
                       <RowDefinition Height="Auto"/>
                       <RowDefinition Height="12"/>
                       <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="12"/>
+                      <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock Text="端口" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtPort" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="30" HorizontalAlignment="Left" Width="120"/>
@@ -544,6 +546,15 @@ $script:pendingStart = $false    # 正在启动服务器
                       <RadioButton x:Name="rdoDark" Content="深色" GroupName="theme" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" IsChecked="True"/>
                       <RadioButton x:Name="rdoLight" Content="浅色" GroupName="theme" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" Margin="20,0,0,0"/>
                     </StackPanel>
+                    <TextBlock Text="强调色" Grid.Row="12" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" VerticalAlignment="Center"/>
+                    <WrapPanel Grid.Row="12" Grid.Column="1" Orientation="Horizontal">
+                      <RadioButton x:Name="rdoAccentGreen"  Content="● 经典青绿" GroupName="accent" Foreground="#3ED6A3" FontSize="12"/>
+                      <RadioButton x:Name="rdoAccentBlue"   Content="● 科技蓝"   GroupName="accent" Foreground="#5B9BFF" FontSize="12" Margin="14,0,0,0"/>
+                      <RadioButton x:Name="rdoAccentPurple" Content="● 蓝紫渐变" GroupName="accent" Foreground="#8B7CF6" FontSize="12" Margin="14,0,0,0"/>
+                      <RadioButton x:Name="rdoAccentAmber"  Content="● 琥珀暖橙" GroupName="accent" Foreground="#F2B14B" FontSize="12" Margin="14,0,0,0"/>
+                      <RadioButton x:Name="rdoAccentRose"   Content="● 玫红"     GroupName="accent" Foreground="#F27DA8" FontSize="12" Margin="14,0,0,0"/>
+                      <RadioButton x:Name="rdoAccentSlate"  Content="● 银灰蓝"   GroupName="accent" Foreground="#9AA7BC" FontSize="12" Margin="14,0,0,0"/>
+                    </WrapPanel>
                   </Grid>
                   <Button x:Name="btnSave" Content="保存设置" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" Width="120" Height="34" Margin="0,18,0,0"/>
                 </StackPanel>
@@ -634,6 +645,12 @@ $chkTrayAuto = $window.FindName('chkTrayAuto')
 $chkDshAutoStart = $window.FindName('chkDshAutoStart')
 $rdoDark     = $window.FindName('rdoDark')
 $rdoLight    = $window.FindName('rdoLight')
+$rdoAccentGreen  = $window.FindName('rdoAccentGreen')
+$rdoAccentBlue   = $window.FindName('rdoAccentBlue')
+$rdoAccentPurple = $window.FindName('rdoAccentPurple')
+$rdoAccentAmber  = $window.FindName('rdoAccentAmber')
+$rdoAccentRose   = $window.FindName('rdoAccentRose')
+$rdoAccentSlate  = $window.FindName('rdoAccentSlate')
 $btnSave     = $window.FindName('btnSave')
 $lblStatus   = $window.FindName('lblStatus')
 
@@ -705,6 +722,16 @@ function Apply-Theme([bool]$isDark) {
         if ($window.Resources.Contains($k)) { $window.Resources.Remove($k) }
         $window.Resources.Add($k, $brush)
     }
+    # 强调色覆盖（用户自选，弹窗/主界面一致）
+    try {
+        $acc = Get-OrcaAccent
+        if ($acc -and $acc.Accent) {
+            $accBrush = New-Brush $acc.Accent
+            $accBrush.Freeze()
+            if ($window.Resources.Contains('ColorAccent')) { $window.Resources.Remove('ColorAccent') }
+            $window.Resources.Add('ColorAccent', $accBrush)
+        }
+    } catch {}
 }
 
 # ---------- 页面切换 ----------
@@ -1385,9 +1412,17 @@ $btnSave.Add_Click({
         $newDshDir = $txtDshDir.Text.Trim()
         if (-not $newDshDir) { throw 'DSH 目录不能为空' }
         $newTheme = if ($rdoLight.IsChecked) { 'light' } else { 'dark' }
+        # 强调色
+        $newAccent = 'blue'
+        if ($rdoAccentGreen.IsChecked)  { $newAccent = 'green' }
+        elseif ($rdoAccentBlue.IsChecked) { $newAccent = 'blue' }
+        elseif ($rdoAccentPurple.IsChecked) { $newAccent = 'purple' }
+        elseif ($rdoAccentAmber.IsChecked) { $newAccent = 'amber' }
+        elseif ($rdoAccentRose.IsChecked) { $newAccent = 'rose' }
+        elseif ($rdoAccentSlate.IsChecked) { $newAccent = 'slate' }
 
         # 1) 写共享配置
-        if (-not (Write-OrcaConfig -Port $newPort -DshDir $newDshDir -TrayAutoStart $chkTrayAuto.IsChecked -Theme $newTheme)) {
+        if (-not (Write-OrcaConfig -Port $newPort -DshDir $newDshDir -TrayAutoStart $chkTrayAuto.IsChecked -Theme $newTheme -Accent $newAccent)) {
             throw '写入配置文件失败'
         }
 
@@ -1418,7 +1453,8 @@ $btnSave.Add_Click({
             Remove-DshAutoStart
         }
 
-        # 4) 应用主题（立即生效，不用重启窗口）
+        # 4) 应用主题 + 强调色（立即生效，不用重启窗口）
+        $script:OrcaAccent = $newAccent
         Apply-Theme ($newTheme -eq 'dark')
         Update-StatusDisplay
 
@@ -1499,6 +1535,15 @@ $window.Add_Loaded({
     $isDark = ($script:orcaCfgTheme -ne 'light')
     Apply-Theme $isDark
     if ($isDark) { $rdoDark.IsChecked = $true } else { $rdoLight.IsChecked = $true }
+    # 强调色单选（按配置选中）
+    switch ($script:orcaCfgAccent) {
+        'green'  { $rdoAccentGreen.IsChecked = $true }
+        'purple' { $rdoAccentPurple.IsChecked = $true }
+        'amber'  { $rdoAccentAmber.IsChecked = $true }
+        'rose'   { $rdoAccentRose.IsChecked = $true }
+        'slate'  { $rdoAccentSlate.IsChecked = $true }
+        default  { $rdoAccentBlue.IsChecked = $true }
+    }
     $txtPort.Text = [string]$script:orcaCfgPort
     $txtDshDir.Text = $script:orcaCfgDshDir
     $chkTrayAuto.IsChecked = $script:orcaCfgTrayAutoStart

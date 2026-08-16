@@ -387,6 +387,34 @@ function New-DesktopShortcut {
 #    → YesNo 返回 $true(是)/$false(否)；OK 返回 $true(好的)
 #  需要 WPF 程序集已加载（调用方在主窗口加载之后调用）。
 
+# ============================================================
+#  七、强调色预设（弹窗/界面配色，可在控制台「设置」页自选）
+# ============================================================
+$script:OrcaAccentPresets = @{
+    'green'  = @{ Name = '经典青绿'; Accent = '#3ED6A3'; AccentDark = '#2BBF87'; Bg = '#1C3A2E'; Line2 = '#2E4B3F' }
+    'blue'   = @{ Name = '科技蓝';   Accent = '#5B9BFF'; AccentDark = '#3B74E8'; Bg = '#1B3A66'; Line2 = '#27405E' }
+    'purple' = @{ Name = '蓝紫渐变'; Accent = '#8B7CF6'; AccentDark = '#6A5AE0'; Bg = '#2A2A5E'; Line2 = '#3A3570' }
+    'amber'  = @{ Name = '琥珀暖橙'; Accent = '#F2B14B'; AccentDark = '#D9942E'; Bg = '#3A3222'; Line2 = '#4A3A22' }
+    'rose'   = @{ Name = '玫红';     Accent = '#F27DA8'; AccentDark = '#D95F8E'; Bg = '#3A2440'; Line2 = '#4A2A45' }
+    'slate'  = @{ Name = '银灰蓝';   Accent = '#9AA7BC'; AccentDark = '#7C8AA3'; Bg = '#2A3240'; Line2 = '#35404F' }
+}
+
+# 读取当前强调色预设（内存变量优先；否则读配置文件 accent 字段；默认科技蓝）
+function Get-OrcaAccent {
+    $name = $script:OrcaAccent
+    if (-not $name) {
+        try {
+            $cfgFile = Join-Path $env:USERPROFILE '.dsh\orca-dsh-launcher.json'
+            if (Test-Path $cfgFile) {
+                $cfg = [System.IO.File]::ReadAllText($cfgFile, (New-Object System.Text.UTF8Encoding($false))) | ConvertFrom-Json
+                if ($cfg.accent) { $name = [string]$cfg.accent }
+            }
+        } catch {}
+    }
+    if (-not $name -or -not $script:OrcaAccentPresets.ContainsKey($name)) { $name = 'blue' }
+    return $script:OrcaAccentPresets[$name]
+}
+
 # 取虎鲸 logo 图像（供对话框品牌行用）
 # EXE 打包版：用内嵌 Base64（$script:OrcaLogoB64，由 build-exe 注入）；
 # 控制台/开发版：读脚本目录的 dsh-tray.ico
@@ -425,11 +453,13 @@ function Show-OrcaDialog {
         $Owner = $null
     )
     # 类型 → 图标/配色/副标题（Orca 青绿品牌色体系）
+    # 类型 → 图标/配色/副标题（强调色跟随设置页自选；warning/error 用专用警示色）
+    $acc = Get-OrcaAccent
     $typeInfo = switch ($Type) {
-        'question' { [pscustomobject]@{ Char = '?'; Accent = '#3ED6A3'; AccentDark = '#2BBF87'; Bg = '#1C3A2E'; Sub = '确认操作' } }
-        'info'     { [pscustomobject]@{ Char = 'i'; Accent = '#3ED6A3'; AccentDark = '#2BBF87'; Bg = '#1C3A2E'; Sub = '提示' } }
-        'warning'  { [pscustomobject]@{ Char = '!'; Accent = '#F0C060'; AccentDark = '#D9A94E'; Bg = '#3A3222'; Sub = '注意' } }
-        'error'    { [pscustomobject]@{ Char = '✕'; Accent = '#E88787'; AccentDark = '#D06565'; Bg = '#3A2626'; Sub = '错误' } }
+        'question' { [pscustomobject]@{ Char = '?'; Accent = $acc.Accent; AccentDark = $acc.AccentDark; Bg = $acc.Bg; Sub = '确认操作' } }
+        'info'     { [pscustomobject]@{ Char = 'i'; Accent = $acc.Accent; AccentDark = $acc.AccentDark; Bg = $acc.Bg; Sub = '提示' } }
+        'warning'  { [pscustomobject]@{ Char = '!'; Accent = '#F2B14B'; AccentDark = '#D9942E'; Bg = '#3A3222'; Sub = '注意' } }
+        'error'    { [pscustomobject]@{ Char = '✕'; Accent = '#EF7F7F'; AccentDark = '#D05B5B'; Bg = '#3A2626'; Sub = '错误' } }
     }
     # 消息可能含路径等特殊字符，转义 XML 防 XAML 解析失败
     $msgSafe = [System.Security.SecurityElement]::Escape($Message)
@@ -518,7 +548,7 @@ function Show-OrcaDialog {
           <Border.Background>
             <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
               <GradientStop Color="$($typeInfo.Accent)" Offset="0"/>
-              <GradientStop Color="#2E4B3F" Offset="1"/>
+              <GradientStop Color="$($acc.Line2)" Offset="1"/>
             </LinearGradientBrush>
           </Border.Background>
         </Border>

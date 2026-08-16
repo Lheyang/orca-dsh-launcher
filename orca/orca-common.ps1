@@ -20,6 +20,7 @@ $script:orcaCfgBranch    = 'master'
 $script:orcaCfgTimeoutMs = 8000
 $script:orcaCfgTrayAutoStart = $true
 $script:orcaCfgTheme     = 'dark'
+$script:orcaCfgAccent    = 'blue'
 
 # ============================================================
 # 一、配置读写
@@ -34,6 +35,7 @@ function Read-OrcaConfig {
     $script:orcaCfgTimeoutMs = 8000
     $script:orcaCfgTrayAutoStart = $true
     $script:orcaCfgTheme     = 'dark'
+    $script:orcaCfgAccent    = 'blue'
 
     if (Test-Path $script:orcaConfigFile) {
         try {
@@ -45,6 +47,7 @@ function Read-OrcaConfig {
             if ($cfg.checkTimeoutMs) { $script:orcaCfgTimeoutMs = [int]$cfg.checkTimeoutMs }
             if ($null -ne $cfg.trayAutoStart) { $script:orcaCfgTrayAutoStart = [bool]$cfg.trayAutoStart }
             if ($cfg.theme -eq 'light' -or $cfg.theme -eq 'dark') { $script:orcaCfgTheme = [string]$cfg.theme }
+            if ($cfg.accent -in @('green','blue','purple','amber','rose','slate')) { $script:orcaCfgAccent = [string]$cfg.accent }
         } catch {}
     }
 }
@@ -55,9 +58,11 @@ function Write-OrcaConfig {
         [int]$Port,
         [string]$DshDir,
         [bool]$TrayAutoStart,
-        [string]$Theme = 'dark'
+        [string]$Theme = 'dark',
+        [string]$Accent = 'blue'
     )
     if ($Theme -ne 'light' -and $Theme -ne 'dark') { $Theme = 'dark' }
+    if ($Accent -notin @('green','blue','purple','amber','rose','slate')) { $Accent = 'blue' }
     $cfg = [ordered]@{
         dshDir         = $DshDir
         port           = $Port
@@ -66,6 +71,7 @@ function Write-OrcaConfig {
         checkTimeoutMs = $script:orcaCfgTimeoutMs
         trayAutoStart  = $TrayAutoStart
         theme          = $Theme
+        accent         = $Accent
     }
     try {
         $dir = Split-Path -Parent $script:orcaConfigFile
