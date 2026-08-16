@@ -51,11 +51,15 @@ function Write-SetupLog {
 }
 
 # 读日志尾部（供界面显示最新进度）
+# 注意：安装进程（cmd 重定向）正持续写这个文件，必须用共享读模式
+# （FileShare.ReadWrite），否则文件被独占锁定会读失败。
 function Get-SetupLogTail {
     param([int]$Lines = 150)
     if (-not (Test-Path $script:InstallLogFile)) { return @('（日志还没开始）') }
     try {
-        $all = [System.IO.File]::ReadAllText($script:InstallLogFile, (New-Object System.Text.UTF8Encoding($false)))
+        $fs = New-Object System.IO.FileStream($script:InstallLogFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        $reader = New-Object System.IO.StreamReader($fs, (New-Object System.Text.UTF8Encoding($false)))
+        try { $all = $reader.ReadToEnd() } finally { $reader.Dispose(); $fs.Dispose() }
         $arr = $all -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 }
         if ($arr.Count -gt $Lines) { return @($arr[($arr.Count - $Lines)..($arr.Count - 1)]) }
         return @($arr)

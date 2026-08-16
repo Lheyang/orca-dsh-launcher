@@ -52,6 +52,23 @@ if ($content -notmatch '__PLUGIN_PAYLOAD_B64__') {
     Write-Host "[错误] orca-setup.ps1 里找不到占位符 __PLUGIN_PAYLOAD_B64__，无法注入"
     exit 1
 }
+
+# 3.1 内联安装逻辑库（关键！ps2exe 打包后 $PSScriptRoot 为空，点源外部文件会失败，
+#     必须把 orca-install.ps1 的内容直接嵌进打包版脚本，EXE 才真正自包含）
+$installLib = Join-Path $proj 'orca\orca-install.ps1'
+if (-not (Test-Path $installLib)) {
+    Write-Host "[错误] 找不到安装逻辑库：$installLib"
+    exit 1
+}
+$libContent = [System.IO.File]::ReadAllText($installLib, (New-Object System.Text.UTF8Encoding($true)))
+$marker = ". (Join-Path `$PSScriptRoot 'orca\orca-install.ps1')"
+if ($content -notmatch [regex]::Escape($marker)) {
+    Write-Host "[错误] orca-setup.ps1 里找不到点源行（$marker），无法内联"
+    exit 1
+}
+$content = $content.Replace($marker, $libContent)
+Write-Host "[3/5] 安装逻辑库已内联（EXE 自包含）"
+
 $packed = $content.Replace('__PLUGIN_PAYLOAD_B64__', $b64)
 $packedFile = Join-Path $env:TEMP 'orca-setup-packed.ps1'
 # 注意：必须带 BOM 写（PowerShell 5.1 解析中文用）

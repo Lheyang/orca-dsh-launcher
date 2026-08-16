@@ -39,6 +39,11 @@ $script:PluginPayloadB64 = $script:SetupPayloadB64
 # 安装日志文件（独立文件，避免和控制台共用日志打架）
 $script:InstallLogFile = Join-Path $env:TEMP 'orca-setup-install.log'
 
+# 本脚本所在目录（顶层计算一次；事件处理器里 $MyInvocation.MyCommand.Path 是空的，不能在那用）
+$script:SetupScriptDir = $null
+try { $script:SetupScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path } catch {}
+if (-not $script:SetupScriptDir) { $script:SetupScriptDir = $PSScriptRoot }
+
 $script:DshDir     = ''            # 用户选择的 DSH 安装目录
 $script:Phase      = 'idle'        # idle / cloning / installing / building / finishing / done / failed
 $script:PhaseError = ''
@@ -577,8 +582,12 @@ function Start-NetCheck {
 $btnNetRetry.Add_Click({ Start-NetCheck })
 $btnNetNext.Add_Click({
     Show-SetupPage 'dir'
-    # 默认位置
-    $default = Join-Path 'D:\' 'deepseek-harness'
+    # 默认位置（可用环境变量 ORCA_SETUP_DEFAULT_DIR 覆盖，供自动化测试用临时目录）
+    $default = if ($env:ORCA_SETUP_DEFAULT_DIR) {
+        Join-Path $env:ORCA_SETUP_DEFAULT_DIR 'deepseek-harness'
+    } else {
+        Join-Path 'D:\' 'deepseek-harness'
+    }
     $dirHint.Text = '默认位置：' + $default + '（也可以点「选择文件夹…」自己定）'
     if (-not $script:DshDir) { $script:DshDir = $default }
     $dirPath.Text = $script:DshDir
@@ -603,7 +612,7 @@ $btnDirNext.Add_Click({
         return
     }
     # 插件包来源检查
-    $script:pluginSource = Get-PluginSource -FallbackDir (Split-Path -Parent $MyInvocation.MyCommand.Path)
+    $script:pluginSource = Get-PluginSource -FallbackDir $script:SetupScriptDir
     if (-not $script:pluginSource) {
         [System.Windows.MessageBox]::Show('找不到插件文件包，请重新下载本程序后再试。', 'Orca DSH Launcher', 'OK', 'Error') | Out-Null
         return
@@ -639,10 +648,16 @@ function Start-Install {
     # 0) 准备目录
     $parent = Split-Path -Parent $dshDir
     if (-not (Test-Path $parent)) {
-        $installStatus.Text = '❌ 所选文件夹不存在：' + $parent
-        $script:Phase = 'failed'
-        $script:PhaseError = '所选文件夹不存在，请返回上一步重新选择。'
-        return
+        # 父目录不存在时自动创建（避免小白因奇怪路径卡住）
+        try {
+            New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            Write-SetupLog ('[安装] 自动创建了文件夹：' + $parent)
+        } catch {
+            $installStatus.Text = '❌ 无法创建文件夹：' + $parent
+            $script:Phase = 'failed'
+            $script:PhaseError = '无法创建文件夹：' + $parent
+            return
+        }
     }
 
     # 1) 下载 DSH（git clone；目录里已有 .git 会自动跳过）
