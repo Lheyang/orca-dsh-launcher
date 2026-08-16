@@ -136,6 +136,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-exe.ps1
 
 语义化版本，`package.json` 为唯一来源（托盘/控制台动态读取）。改版本只需：`package.json` + `CHANGELOG.md` + 本 README 顶部 badge。
 
+## 常见问题（FAQ）
+
+**Orca DSH Launcher 是什么？**
+为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH，DeepSeek 开源 AI 智能体框架）打造的 Windows 桌面伴侣与 Cordis 插件：更新检查、服务器启停、系统托盘、图形控制台、一键安装。
+
+**它会自动更新 DSH 吗？**
+不会。它只检查并提醒，**绝不自动更新**，也绝不改动 DSH 的任何源码文件。
+
+**支持哪些平台？**
+Windows（PowerShell 5.1 / .NET Framework）。DSH 本体需要 Node.js 与 git。
+
+**需要先装好 DSH 才能用吗？**
+插件模式需要先有 DSH；全新电脑可直接用 `orca-setup.exe` 一键安装 DSH + 本插件。
+
+**端口冲突怎么办？**
+启动前自动检测端口占用；非 DSH 进程**不会误杀**，并明确提示占用者。
+
+**和官方 Web 版（`npx @deepseek-ai/dsh web`）什么关系？**
+那是 DSH 官方的最简启动方式（只需 Node.js）；本插件是在此基础上提供更新提醒、托盘、图形控制台和一键安装的增强工具。
+
 ## 变更记录
 
 [CHANGELOG.md](CHANGELOG.md)

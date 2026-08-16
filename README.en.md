@@ -136,6 +136,26 @@ After editing code: run `test-all.ps1` → run `install.ps1` to sync → restart
 
 Semantic versioning; `package.json` is the single source of truth (tray/console read it dynamically). To bump the version, update: `package.json` + `CHANGELOG.md` + the README badge above.
 
+## FAQ
+
+**What is Orca DSH Launcher?**
+A Windows desktop companion and Cordis plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH, DeepSeek's open-source AI agent harness): update checking, server start/stop, system tray, graphical console, and one-click installation.
+
+**Does it auto-update DSH?**
+No. It only checks and notifies — it **never auto-updates** and never modifies any of DSH's source files.
+
+**Which platforms are supported?**
+Windows (PowerShell 5.1 / .NET Framework). DSH itself requires Node.js and git.
+
+**Do I need DSH installed first?**
+Plugin mode requires an existing DSH installation; on a fresh machine you can use `orca-setup.exe` to install DSH and this plugin in one click.
+
+**What if the port is occupied?**
+Port ownership is detected before starting; non-DSH processes are **never killed**, and the occupying process is clearly reported.
+
+**How does this relate to the official Web version (`npx @deepseek-ai/dsh web`)?**
+That is DSH's official minimal launch method (Node.js only); this plugin enhances it with update reminders, a system tray, a graphical console, and a one-click installer.
+
 ## Changelog
 
 [CHANGELOG.md](CHANGELOG.md)

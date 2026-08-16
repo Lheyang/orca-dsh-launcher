@@ -1,0 +1,41 @@
+# Orca DSH Launcher
+
+> A Windows desktop companion and Cordis plugin for DeepSeek Harness (DSH): update checking, server start/stop, system tray, WPF graphical console, and a one-click installation wizard.
+
+Orca DSH Launcher is an open-source plugin and desktop toolset for DeepSeek Harness (also known as DSH or deepseek-harness), the open-source AI agent harness by DeepSeek. It helps DSH users manage their local DSH installation on Windows: it checks for official updates, controls the DSH web server, adds a system tray icon and a graphical management console, and can install DSH on a brand-new computer with one click.
+
+## What it does
+
+- Checks for DSH updates on every startup (query only - never auto-updates, never modifies DSH source)
+- `/orca` slash command set: status, check, start, stop, restart, open, log, port, config, health/diagnose, console, tray
+- System tray icon (WinForms NotifyIcon): left-click opens the UI, right-click menu starts/stops the server and checks updates
+- WPF graphical console (Overview / Server / Install / Logs / Settings / About) with dark/light themes
+- One-click installation wizard (orca-setup.exe) for installing DSH on a fresh machine: environment check, network check, git clone, pnpm install + build, plugin install
+- Port ownership detection so it never kills unrelated Node processes
+- Daily automatic update checks (notification only)
+
+## Technologies
+
+- Node.js / Cordis plugin (object plugin form, inject: ['commands'])
+- PowerShell 5.1 (WPF console UI, WinForms tray, install and setup scripts)
+- Windows platform only
+- git, pnpm, npx @deepseek-ai/dsh
+
+## Installation
+
+Existing DSH users:
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+
+Fresh machine: download orca-setup.exe from the Releases page and double-click it.
+
+DSH official Web version (no plugin needed):
+npx @deepseek-ai/dsh web
+
+## Links
+
+- [README (English)](https://github.com/Lheyang/orca-dsh-launcher/blob/master/README.en.md)
+- [README (中文)](https://github.com/Lheyang/orca-dsh-launcher/blob/master/README.md)
+- [Changelog](https://github.com/Lheyang/orca-dsh-launcher/blob/master/CHANGELOG.md)
+- [Contributing guidelines](https://github.com/Lheyang/orca-dsh-launcher/blob/master/CONTRIBUTING.md)
+- [License (MIT)](https://github.com/Lheyang/orca-dsh-launcher/blob/master/LICENSE)
+- [Releases](https://github.com/Lheyang/orca-dsh-launcher/releases)

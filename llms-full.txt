@@ -1,0 +1,114 @@
+# Orca DSH Launcher
+
+Version v1.6.0 | Platform Windows | License MIT
+
+A Cordis plugin + desktop component for DeepSeek Harness (DSH) that provides update checking, server start/stop, system tray, a graphical console, and one-click installation.
+
+Project homepage: https://github.com/Lheyang/orca-dsh-launcher
+
+## Features
+
+- Update check: On DSH startup, compares the local git commit against the official master branch. If an update exists, it logs a message and shows a notification. Query only - never auto-updates.
+- /orca command set: 14 sub-commands covering status, start/stop, restart, logs, port, config, diagnostics, tray, and console.
+- System tray: WinForms NotifyIcon - left-click opens the UI, right-click menu starts/stops the server and checks for updates.
+- Graphical console: WPF management window (Overview / Server / Install / Logs / Settings / About) with dark/light themes; opens even when DSH is not running.
+- One-click install: The console Install page or the standalone wizard orca-setup (single-file EXE distribution) supports two paths: full version (git clone + pnpm install + pnpm run build + pnpm dsh web), or official Web version (npx @deepseek-ai/dsh web, Node.js only).
+- Not-installed guidance: When DSH is not installed, the status card and start/open buttons clearly prompt and guide the user to the Install page - no silent failures.
+
+## Installation
+
+Quick start with DSH (official Web version, no plugin needed):
+npx @deepseek-ai/dsh web
+
+Install this plugin (DSH already installed):
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+Then restart DSH to activate.
+
+The install script copies the runtime files to ~/.dsh/profiles/web/node_modules/orca-dsh-launcher/, appends an insert registration to cordis.patch.yml (UTF-8 without BOM), automatically migrates the legacy dsh-update-checker plugin, and creates a startup tray shortcut and a desktop icon (skip with -SkipStartupShortcut / -SkipDesktopShortcut).
+
+Uninstall: scripts\uninstall.ps1 (auto-backup; -KillTray also closes the tray; -KeepShortcut keeps the startup shortcut).
+
+One-click DSH install on a fresh machine:
+- Option 1: Download orca-setup.exe from GitHub Releases and double-click it (embedded plugin package, single-file distribution).
+- Option 2: After installing this plugin, open the console Install page and choose "Install Full Version" or "Launch Official Web Version".
+
+## Usage
+
+/orca slash commands (handler returns { kind: 'success' | 'error', text }; config is re-read on every execution):
+
+- /orca status (状态): server / port / update status
+- /orca check (检查): check for updates now
+- /orca start (启动): start the DSH server
+- /orca stop (关闭): stop the DSH server (never kills non-DSH processes)
+- /orca restart (重启): one-click restart
+- /orca open (打开): open the UI (auto-starts the server first if not running)
+- /orca log (日志): recent run logs
+- /orca port (端口): port ownership details
+- /orca config (配置): current effective configuration
+- /orca health / diagnose (诊断): environment health check
+- /orca console (控制台): open the graphical console
+- /orca tray (托盘) / /orca tray-stop (关闭托盘): start / stop the tray
+- /orca help (帮助): help
+
+Tray: left-click opens the UI; right-click menu includes "Open Console...", "Check for Updates", "Start/Stop Server", and "Log Location...".
+
+## Configuration
+
+Config file: ~/.dsh/orca-dsh-launcher.json (pure ASCII JSON, shared by tray/console/plugin; auto-generated with defaults on first run).
+
+Fields and defaults:
+- dshDir: local DSH source directory (default D:\deepseek harness)
+- port: Web UI port (default 3080)
+- repo: official repository (default deepseek-ai/deepseek-harness)
+- branch: branch to check (default master)
+- checkTimeoutMs: network query timeout (default 8000)
+- trayAutoStart: auto-start tray when DSH starts (default true)
+- theme: console theme (default dark)
+
+User data (do not delete): orca-dsh-launcher.json (config), orca-stats.json (usage stats, atomic writes), orca-dsh-server.log (server log, auto-rotated above 2MB), update-check-state.json (update check results).
+
+## Architecture
+
+- plugin.js: Cordis plugin - update check, /orca commands, launches tray and console
+- orca/orca-common.ps1: shared logic library - config, start/stop, port detection, stats, update check (shared by tray and console)
+- orca/orca-install.ps1: install core logic - environment and network detection, git clone, pnpm install+build, npx web launch, plugin install (shared by wizard and console)
+- orca/dsh-tray.ps1: system tray (WinForms NotifyIcon)
+- orca/dsh-console.ps1: graphical console (WPF navigation UI)
+- orca/start-*.vbs/ps1: hidden-window launchers and startup entries
+- orca-setup.ps1: standalone install wizard (packaged as orca-setup.exe)
+- scripts/install.ps1: install the plugin into DSH (copy + register + startup + desktop icon)
+- scripts/uninstall.ps1: uninstall
+- scripts/test-all.ps1: full test suite (7 items)
+- scripts/build-exe.ps1: build the launcher EXE (ps2exe + payload injection)
+- test/: smoke, inject, real-cordis, and payload pipeline tests
+
+Key technical points:
+- Cordis plugin form: object plugin { name, inject: ['commands'], apply } - inject must be declared explicitly, otherwise "cannot get property commands without inject".
+- Encoding conventions: .ps1 files must be UTF-8 with BOM (PowerShell 5.1 parses BOM-less files as GBK and mangles Chinese); JSON/YAML config files must be read/written with explicit UTF-8 without BOM via .NET methods.
+- Port ownership detection: Get-NetTCPConnection / netstat -ano to get the PID, then Get-CimInstance Win32_Process for the command line, regex pnpm|dsh|deepseek|harness|tsx to decide whether it is DSH, avoiding killing unrelated Node processes.
+- Payload injection: build-exe.ps1 packages the plugin files into a zip then Base64 and replaces the __PLUGIN_PAYLOAD_B64__ placeholder in orca-install.ps1; at runtime it unpacks to a temp directory (single-file EXE distribution, offline plugin install).
+- Process management: installs/starts run in the background via Start-Process cmd /c ... >> log 2>&1; the UI polls HasExited and the log tail with a DispatcherTimer (800ms) to avoid blocking the interface.
+
+## Development
+
+Environment: Windows, PowerShell 5.1, Node.js.
+
+Full test suite (7 items: syntax, plugin load, console self-check, tray self-check, real Cordis load, wizard self-check, payload pipeline):
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-all.ps1
+
+Build the EXE (output dist\orca-setup.exe, upload to GitHub Releases):
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-exe.ps1
+
+Project version is the code in this repository; the runtime version lives at ~/.dsh/profiles/web/node_modules/orca-dsh-launcher/ (what DSH actually loads; install.ps1 syncs and backs up automatically).
+
+Versioning: semantic versioning, package.json is the single source of truth (tray/console read it dynamically).
+
+## Changelog
+
+See CHANGELOG.md: https://github.com/Lheyang/orca-dsh-launcher/blob/master/CHANGELOG.md
+
+## License
+
+MIT: https://github.com/Lheyang/orca-dsh-launcher/blob/master/LICENSE
+
+About the orca: Orcas are smart, elegant, and great team players - this tool's goal is to quietly guard your DSH, there whenever you call.
