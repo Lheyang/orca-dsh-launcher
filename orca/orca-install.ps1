@@ -395,8 +395,13 @@ function Show-OrcaDialog {
         [ValidateSet('YesNo','OK')][string]$Buttons = 'OK',
         $Owner = $null
     )
-    $iconMap = @{ question = '❓'; info = '🐋'; warning = '⚠️'; error = '❌' }
-    $icon = $iconMap[$Type]
+    # 类型 → 图标/配色/副标题（Orca 青绿品牌色体系）
+    $typeInfo = switch ($Type) {
+        'question' { [pscustomobject]@{ Char = '?'; Accent = '#3ED6A3'; AccentDark = '#2BBF87'; Bg = '#1C3A2E'; Sub = '确认操作' } }
+        'info'     { [pscustomobject]@{ Char = 'i'; Accent = '#3ED6A3'; AccentDark = '#2BBF87'; Bg = '#1C3A2E'; Sub = '提示' } }
+        'warning'  { [pscustomobject]@{ Char = '!'; Accent = '#F0C060'; AccentDark = '#D9A94E'; Bg = '#3A3222'; Sub = '注意' } }
+        'error'    { [pscustomobject]@{ Char = '✕'; Accent = '#E88787'; AccentDark = '#D06565'; Bg = '#3A2626'; Sub = '错误' } }
+    }
     # 消息可能含路径等特殊字符，转义 XML 防 XAML 解析失败
     $msgSafe = [System.Security.SecurityElement]::Escape($Message)
     $titleSafe = [System.Security.SecurityElement]::Escape($Title)
@@ -408,47 +413,114 @@ function Show-OrcaDialog {
         SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ShowInTaskbar="False" FontFamily="Microsoft YaHei UI" Topmost="True">
   <Window.Resources>
-    <Style x:Key="DLGBtn" TargetType="Button">
-      <Setter Property="Background" Value="#2D2D2D"/>
-      <Setter Property="Foreground" Value="#E0E0E0"/>
-      <Setter Property="BorderThickness" Value="0"/>
+    <!-- 次按钮：灰底描边 -->
+    <Style x:Key="DlgGhost" TargetType="Button">
+      <Setter Property="Background" Value="#262A33"/>
+      <Setter Property="Foreground" Value="#C6C8D2"/>
+      <Setter Property="BorderBrush" Value="#343947"/>
+      <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="FontSize" Value="13"/>
-      <Setter Property="Padding" Value="20,7"/>
-      <Setter Property="Margin" Value="0,0,0,0"/>
+      <Setter Property="Padding" Value="22,8"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="#3A3A3A"/>
+                <Setter TargetName="bd" Property="Background" Value="#303542"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="#1F222A"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
       </Setter>
     </Style>
-    <Style x:Key="DLGBtnPrimary" TargetType="Button" BasedOn="{StaticResource DLGBtn}">
-      <Setter Property="Background" Value="#F0F0F0"/>
-      <Setter Property="Foreground" Value="#101010"/>
+    <!-- 主按钮：品牌色渐变 -->
+    <Style x:Key="DlgPrimary" TargetType="Button">
+      <Setter Property="Foreground" Value="#0C120E"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Padding" Value="24,8"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="bd" CornerRadius="8">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                  <GradientStop Color="$($typeInfo.Accent)" Offset="0"/>
+                  <GradientStop Color="$($typeInfo.AccentDark)" Offset="1"/>
+                </LinearGradientBrush>
+              </Border.Background>
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Opacity" Value="0.9"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="bd" Property="Opacity" Value="0.72"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
   </Window.Resources>
-  <Border CornerRadius="12" Background="#1E1E1E" BorderThickness="1" BorderBrush="#2A2A2A" Padding="20,18">
-    <StackPanel>
-      <StackPanel Orientation="Horizontal">
-        <TextBlock x:Name="dlgIco" Text="$icon" FontSize="20" VerticalAlignment="Center"/>
-        <TextBlock x:Name="dlgTitle" Text="$titleSafe" FontSize="15" FontWeight="Bold" Foreground="#F0F0F0" Margin="10,0,0,0" VerticalAlignment="Center"/>
+  <Border x:Name="dlgRoot" CornerRadius="14">
+    <Border.Effect>
+      <DropShadowEffect BlurRadius="28" ShadowDepth="0" Opacity="0.65" Color="#000000"/>
+    </Border.Effect>
+    <Border CornerRadius="14" BorderThickness="1" BorderBrush="#2E3340">
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+          <GradientStop Color="#1D2027" Offset="0"/>
+          <GradientStop Color="#15171C" Offset="1"/>
+        </LinearGradientBrush>
+      </Border.Background>
+      <StackPanel>
+        <!-- 顶部品牌色线条 -->
+        <Border Height="4" CornerRadius="2,2,0,0" Margin="1,1,1,0">
+          <Border.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+              <GradientStop Color="$($typeInfo.Accent)" Offset="0"/>
+              <GradientStop Color="#2E4B3F" Offset="1"/>
+            </LinearGradientBrush>
+          </Border.Background>
+        </Border>
+        <!-- 品牌行 -->
+        <DockPanel Margin="20,14,20,0">
+          <TextBlock Text="🐋" FontSize="12" VerticalAlignment="Center" Opacity="0.9"/>
+          <TextBlock Text="Orca DSH Launcher" FontSize="10.5" Foreground="#7A7E8C" Margin="6,0,0,0" VerticalAlignment="Center"/>
+        </DockPanel>
+        <!-- 内容区 -->
+        <StackPanel Margin="20,16,20,0">
+          <StackPanel Orientation="Horizontal">
+            <Border Width="38" Height="38" CornerRadius="19" Background="$($typeInfo.Bg)">
+              <TextBlock x:Name="dlgIco" Text="$($typeInfo.Char)" FontSize="17" FontWeight="Bold"
+                         Foreground="$($typeInfo.Accent)" FontFamily="Segoe UI"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <StackPanel Margin="13,0,0,0" VerticalAlignment="Center">
+              <TextBlock x:Name="dlgTitle" Text="$titleSafe" FontSize="17" FontWeight="Bold" Foreground="#F0F0F2"/>
+              <TextBlock x:Name="dlgSub" Text="$($typeInfo.Sub)" FontSize="10.5" Foreground="#6E7180" Margin="0,3,0,0"/>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock x:Name="dlgMsg" Text="$msgSafe" FontSize="13" Foreground="#A8AAB5" TextWrapping="Wrap"
+                     MaxWidth="420" LineHeight="22" Margin="0,18,0,0"/>
+        </StackPanel>
+        <!-- 按钮行 -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,22,20,20">
+          <Button x:Name="btnNo" Style="{StaticResource DlgGhost}"/>
+          <Button x:Name="btnYes" Style="{StaticResource DlgPrimary}" Margin="10,0,0,0"/>
+        </StackPanel>
       </StackPanel>
-      <TextBlock x:Name="dlgMsg" Text="$msgSafe" FontSize="13" Foreground="#C8C8D0" TextWrapping="Wrap" MaxWidth="430"
-                 Margin="0,14,0,0" LineHeight="21"/>
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-        <Button x:Name="btnNo" Content="否" Style="{StaticResource DLGBtn}"/>
-        <Button x:Name="btnYes" Content="是" Style="{StaticResource DLGBtnPrimary}" Margin="10,0,0,0"/>
-      </StackPanel>
-    </StackPanel>
+    </Border>
   </Border>
 </Window>
 "@
@@ -473,6 +545,18 @@ function Show-OrcaDialog {
         }
         $btnYes.Add_Click({ $script:dialogResult = $true; $dlg.Close() })
         $btnNo.Add_Click({ $script:dialogResult = $false; $dlg.Close() })
+
+        # 淡入动效
+        $dlg.Add_Loaded({
+            try {
+                $rootEl = $dlg.FindName('dlgRoot')
+                $rootEl.Opacity = 0
+                $anim = New-Object System.Windows.Media.Animation.DoubleAnimation
+                $anim.From = 0; $anim.To = 1
+                $anim.Duration = [TimeSpan]::FromMilliseconds(180)
+                $rootEl.BeginAnimation([System.Windows.Controls.Control]::OpacityProperty, $anim)
+            } catch {}
+        })
 
         # 注意：PowerShell 里 $dlg.ShowDialog($Owner) 会找不到带参重载，
         # 必须先设置 Owner 属性，再调用无参 ShowDialog()
