@@ -22,233 +22,38 @@
 $ErrorActionPreference = 'Stop'
 
 # ============================================================
-#  一、常量与全局状态
+#  一、加载公共安装逻辑库 + 全局状态
 # ============================================================
 
 # 插件包（plugin.js + package.json + orca\ 全部文件）的 Base64。
-# 由 build-exe.ps1 打包时自动注入；直接运行本 ps1 时这里保持
-# 占位符，程序会改从脚本所在目录读取插件文件（开发模式）。
-$PLUGIN_PAYLOAD_B64 = '__PLUGIN_PAYLOAD_B64__'
+# 由 build-exe.ps1 打包时自动注入；直接运行本 ps1 时保持占位符，
+# 程序会改从脚本所在目录读取插件文件（开发模式）。
+$script:SetupPayloadB64 = '__PLUGIN_PAYLOAD_B64__'
 
-$script:SetupLog   = Join-Path $env:TEMP 'orca-setup-install.log'
+# 加载安装核心逻辑库（环境/网络检测、clone、install+build、npx web、装插件）
+. (Join-Path $PSScriptRoot 'orca\orca-install.ps1')
+
+# 用本向导的 payload 覆盖库里的占位符（打包版才有真实值）
+$script:PluginPayloadB64 = $script:SetupPayloadB64
+
+# 安装日志文件（独立文件，避免和控制台共用日志打架）
+$script:InstallLogFile = Join-Path $env:TEMP 'orca-setup-install.log'
+
 $script:DshDir     = ''            # 用户选择的 DSH 安装目录
-$script:Phase      = 'idle'        # idle / cloning / installing / finishing / done / failed
+$script:Phase      = 'idle'        # idle / cloning / installing / building / finishing / done / failed
 $script:PhaseError = ''
 $script:Proc       = $null         # 当前正在跑的安装子进程
 $script:SkipClone  = $false        # 目录里已有 DSH，跳过下载
 
-# ============================================================
-#  二、工具函数
-# ============================================================
-
-# 快速测试一个主机端口通不通（3 秒超时，比 Test-NetConnection 快得多）
-function Test-HostPort {
-    param([string]$HostName, [int]$Port = 443)
-    try {
-        $client = New-Object System.Net.Sockets.TcpClient
-        try {
-            $iar = $client.BeginConnect($HostName, $Port, $null, $null)
-            $ok = $iar.AsyncWaitHandle.WaitOne(3000)
-            if ($ok -and $client.Connected) { return $true }
-        } finally { $client.Close() }
-    } catch {}
-    return $false
-}
-
-# 查一个命令是否存在并返回版本号（失败返回 $null）
-function Get-CommandVersion {
-    param([string]$Name)
-    try {
-        $out = & $Name --version 2>$null
-        if ($LASTEXITCODE -eq 0 -and $out) { return ($out | Select-Object -First 1).Trim() }
-    } catch {}
-    return $null
-}
-
-# GitHub 网络体检：测三个关键地址，返回结果对象
-function Test-GithubNetwork {
-    $results = [ordered]@{
-        github      = Test-HostPort 'github.com' 443
-        codeload    = Test-HostPort 'codeload.github.com' 443
-        api         = Test-HostPort 'api.github.com' 443
-    }
-    # 再对主站发一个 HTTPS 请求验证（能连端口不等于能正常访问）
-    $httpOk = $false
-    if ($results.github) {
-        try {
-            $r = Invoke-WebRequest -Uri 'https://github.com' -Method Head -TimeoutSec 8 -UseBasicParsing -ErrorAction Stop
-            if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 400) { $httpOk = $true }
-        } catch {}
-    }
-    $okCount = @($results.Values | Where-Object { $_ }).Count
-    return [pscustomobject]@{
-        githubOk = ($okCount -ge 2 -and $httpOk)   # 至少两个地址通且主站可访问
-        httpOk   = $httpOk
-        github   = $results.github
-        codeload = $results.codeload
-        api      = $results.api
-        detail   = ('github.com=' + $(if ($results.github) { '通' } else { '不通' }) +
-                    '，codeload=' + $(if ($results.codeload) { '通' } else { '不通' }) +
-                    '，api=' + $(if ($results.api) { '通' } else { '不通' }) +
-                    '，主站访问=' + $(if ($httpOk) { '正常' } else { '异常' }))
-    }
-}
-
-# 写日志文件（UTF-8 无 BOM）
-function Write-SetupLog {
-    param([string]$Text)
-    try {
-        [System.IO.File]::AppendAllText($script:SetupLog, $Text + "`n", (New-Object System.Text.UTF8Encoding($false)))
-    } catch {}
-}
-
-# 读日志尾部（供界面显示最新进度）
-function Get-SetupLogTail {
-    param([int]$Lines = 120)
-    if (-not (Test-Path $script:SetupLog)) { return @('（日志还没开始）') }
-    try {
-        $all = [System.IO.File]::ReadAllText($script:SetupLog, (New-Object System.Text.UTF8Encoding($false)))
-        $arr = $all -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 }
-        if ($arr.Count -gt $Lines) { return @($arr[($arr.Count - $Lines)..($arr.Count - 1)]) }
-        return @($arr)
-    } catch { return @('（读日志失败）') }
-}
+# （工具函数 / 插件包来源 / 插件安装等公共逻辑全部在 orca-install.ps1 里，
+#   本向导和图形控制台共用同一份，改逻辑只改一处）
 
 # ============================================================
-#  三、插件包来源
+#  二、安装流程编排（向导专用，公共逻辑在 orca-install.ps1）
 # ============================================================
 
-# 拿到插件包所在目录：
-#   打包版 → 把内嵌 Base64 解压到临时目录
-#   开发版 → 直接用脚本所在目录（orca-setup.ps1 旁边的文件）
-function Get-PluginSource {
-    $payload = $PLUGIN_PAYLOAD_B64
-    if ($payload -and $payload -notmatch '^__' -and $payload.Length -gt 100) {
-        $tmp = Join-Path $env:TEMP ("orca-plugin-" + [guid]::NewGuid().ToString('N'))
-        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-        $zip = Join-Path $tmp 'plugin.zip'
-        try {
-            [System.IO.File]::WriteAllBytes($zip, [System.Convert]::FromBase64String($payload))
-            Expand-Archive -Path $zip -DestinationPath $tmp -Force
-            Remove-Item $zip -Force
-            return $tmp
-        } catch {
-            return $null
-        }
-    }
-    # 开发模式：脚本旁边的 orca 目录 + plugin.js + package.json
-    $src = Split-Path -Parent $MyInvocation.MyCommand.Path
-    if (Test-Path (Join-Path $src 'plugin.js') -and (Test-Path (Join-Path $src 'orca'))) {
-        return $src
-    }
-    return $null
-}
-
 # ============================================================
-#  四、安装核心逻辑
-# ============================================================
-
-# 把插件装进 DSH：复制文件 + 登记配置 + 写共享配置
-function Install-Plugin {
-    param([string]$PluginSource, [string]$DshDir)
-    $homeDir     = $env:USERPROFILE
-    $profileDir  = Join-Path $homeDir '.dsh\profiles\web'
-    $nodeModules = Join-Path $profileDir 'node_modules'
-    $targetDir   = Join-Path $nodeModules 'orca-dsh-launcher'
-    $patchFile   = Join-Path $profileDir 'cordis.patch.yml'
-
-    # 0) 检查 DSH 插件目录是否存在
-    if (-not (Test-Path $nodeModules)) {
-        throw '找不到 DSH 插件目录（' + $nodeModules + '），请先手动运行一次 DSH'
-    }
-
-    # 1) 复制插件文件
-    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
-    Copy-Item (Join-Path $PluginSource 'plugin.js') $targetDir -Force
-    Copy-Item (Join-Path $PluginSource 'package.json') $targetDir -Force
-    New-Item -ItemType Directory -Path (Join-Path $targetDir 'orca') -Force | Out-Null
-    Copy-Item (Join-Path $PluginSource 'orca\*') (Join-Path $targetDir 'orca') -Recurse -Force
-    Write-SetupLog '[插件] 文件已复制到 DSH 插件目录'
-
-    # 2) 在 cordis.patch.yml 末尾登记（UTF-8 无 BOM，不能用 Get-Content）
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    if (-not (Test-Path $patchFile)) {
-        New-Item -ItemType File -Path $patchFile -Force | Out-Null
-        [System.IO.File]::WriteAllText($patchFile, "# 由 Orca DSH Launcher 自动创建`n", $utf8NoBom)
-    }
-    $content = [System.IO.File]::ReadAllText($patchFile, $utf8NoBom)
-    if ($content -notmatch 'orca-dsh-launcher') {
-        $entry = @"
-
-# --- orca-dsh-launcher 启动器插件 (自动安装，勿删此注释块) ---
-- insert:
-    - id: orca-dsh-launcher
-      name: 'orca-dsh-launcher'
-# --- end orca-dsh-launcher ---
-"@
-        [System.IO.File]::WriteAllText($patchFile, $content + $entry, $utf8NoBom)
-        Write-SetupLog '[插件] 已在 DSH 配置中登记'
-    } else {
-        Write-SetupLog '[插件] 之前已登记过，跳过'
-    }
-
-    # 3) 写共享配置（把 dshDir 指向实际安装位置，其余用默认值）
-    $cfgFile = Join-Path $homeDir '.dsh\orca-dsh-launcher.json'
-    $cfg = [ordered]@{
-        dshDir         = $DshDir
-        port           = 3080
-        repo           = 'deepseek-ai/deepseek-harness'
-        branch         = 'master'
-        checkTimeoutMs = 8000
-        trayAutoStart  = $true
-        theme          = 'dark'
-    }
-    [System.IO.File]::WriteAllText($cfgFile, ($cfg | ConvertTo-Json), $utf8NoBom)
-    Write-SetupLog ('[插件] 配置已写入（DSH 目录：' + $DshDir + '）')
-    return $true
-}
-
-# 创建桌面图标（打开控制台管理窗口）
-function New-DesktopShortcut {
-    param([string]$PluginTargetDir)
-    try {
-        $desktopDir = [Environment]::GetFolderPath('Desktop')
-        $consoleVbs = Join-Path $PluginTargetDir 'orca\start-console.vbs'
-        $icoPath    = Join-Path $PluginTargetDir 'orca\dsh-tray.ico'
-        $lnkPath    = Join-Path $desktopDir 'Orca DSH Launcher.lnk'
-        if (-not (Test-Path $consoleVbs)) { return $false }
-        $ws = New-Object -ComObject WScript.Shell
-        $sc = $ws.CreateShortcut($lnkPath)
-        $sc.TargetPath = 'wscript.exe'
-        $sc.Arguments = '"' + $consoleVbs + '"'
-        $sc.WorkingDirectory = (Split-Path -Parent $consoleVbs)
-        $sc.Description = 'Orca DSH Launcher 控制台（管理 DSH）'
-        if (Test-Path $icoPath) { $sc.IconLocation = "$icoPath,0" }
-        $sc.Save()
-        return $true
-    } catch { return $false }
-}
-
-# 启动 DSH 服务器（后台运行，输出进日志），等待就绪后打开浏览器
-function Start-DshAndOpen {
-    param([string]$DshDir, [int]$Port = 3080)
-    if (-not (Test-Path (Join-Path $DshDir 'package.json'))) { return $false }
-    $logFile = Join-Path $env:USERPROFILE '.dsh\orca-dsh-server.log'
-    $cmd = "cd /d `"$DshDir`" && pnpm dsh web >> `"$logFile`" 2>&1"
-    Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', $cmd -WindowStyle Hidden | Out-Null
-    # 等端口就绪（最多 120 秒，每 0.5 秒查一次）
-    for ($i = 0; $i -lt 240; $i++) {
-        if (Test-HostPort '127.0.0.1' $Port) {
-            Start-Process "http://127.0.0.1:$Port"
-            return $true
-        }
-        Start-Sleep -Milliseconds 500
-    }
-    return $false
-}
-
-# ============================================================
-#  五、自检模式（供测试脚本用，不弹窗口，输出 JSON 后退出）
+#  三、自检模式（供测试脚本用，不弹窗口，输出 JSON 后退出）
 # ============================================================
 if ($args -contains '-QuickCheck') {
     try {
@@ -798,7 +603,7 @@ $btnDirNext.Add_Click({
         return
     }
     # 插件包来源检查
-    $script:pluginSource = Get-PluginSource
+    $script:pluginSource = Get-PluginSource -FallbackDir (Split-Path -Parent $MyInvocation.MyCommand.Path)
     if (-not $script:pluginSource) {
         [System.Windows.MessageBox]::Show('找不到插件文件包，请重新下载本程序后再试。', 'Orca DSH Launcher', 'OK', 'Error') | Out-Null
         return
@@ -807,7 +612,19 @@ $btnDirNext.Add_Click({
     Start-Install
 })
 
-# ---------- 安装流程 ----------
+# 启动已安装的 DSH 并打开浏览器（完成页按钮用）
+function Start-DshAndOpen {
+    param([string]$DshDir, [int]$Port = 3080)
+    $r = Start-DshFromDir -DshDir $DshDir -Port $Port
+    if (-not $r.ok) { return $false }
+    if (Wait-PortReady -Port $Port -TimeoutSeconds 120) {
+        Start-Process "http://127.0.0.1:$Port"
+        return $true
+    }
+    return $false
+}
+
+# ---------- 安装流程（状态机：cloning → installing → building → finishing → done） ----------
 function Start-Install {
     $script:Phase = 'idle'
     $installTitle.Text = '开始安装'
@@ -815,7 +632,7 @@ function Start-Install {
     $btnCancelInstall.IsEnabled = $true
     $btnInstallNext.IsEnabled = $false
     # 清空旧日志
-    try { Remove-Item $script:SetupLog -Force -ErrorAction SilentlyContinue } catch {}
+    try { Remove-Item $script:InstallLogFile -Force -ErrorAction SilentlyContinue } catch {}
 
     $dshDir = $script:DshDir
 
@@ -827,30 +644,19 @@ function Start-Install {
         $script:PhaseError = '所选文件夹不存在，请返回上一步重新选择。'
         return
     }
-    $script:SkipClone = $false
-    if (Test-Path $dshDir) {
-        if (Test-Path (Join-Path $dshDir '.git')) {
-            $script:SkipClone = $true
-            Write-SetupLog '检测到该目录已装过 DSH（有 .git），跳过下载，直接安装依赖。'
-        } elseif ((Get-ChildItem $dshDir -Force | Measure-Object).Count -gt 0) {
-            $installStatus.Text = '❌ 目标文件夹已存在且不是 DSH：' + $dshDir
-            $script:Phase = 'failed'
-            $script:PhaseError = '目标文件夹非空且不是 DSH 项目，请返回上一步换一个位置。'
-            return
-        }
-    }
 
-    # 1) 下载 DSH（git clone）
-    if (-not $script:SkipClone) {
+    # 1) 下载 DSH（git clone；目录里已有 .git 会自动跳过）
+    $clone = Install-DshClone -DshDir $dshDir
+    if (-not $clone.ok) {
+        $installStatus.Text = '❌ ' + $clone.error
+        $script:Phase = 'failed'
+        $script:PhaseError = $clone.error
+        return
+    }
+    if ($null -ne $clone.proc) {
         $script:Phase = 'cloning'
         $installStatus.Text = '正在下载 DSH 源码（git clone，取决于网速，请耐心等待）…'
-        Write-SetupLog '========================================'
-        Write-SetupLog '第 1 步：下载 DSH 源码'
-        Write-SetupLog '========================================'
-        Write-SetupLog ('目标目录：' + $dshDir)
-        New-Item -ItemType Directory -Path $dshDir -Force | Out-Null
-        $cloneCmd = "git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness.git `"$dshDir`" >> `"$($script:SetupLog)`" 2>&1"
-        $script:Proc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', $cloneCmd -WindowStyle Hidden -PassThru
+        $script:Proc = $clone.proc
         $tickTimer.Start()
         return
     }
@@ -863,14 +669,22 @@ function Start-Install {
 function Start-PnpmInstall {
     $script:Phase = 'installing'
     $installStatus.Text = '正在安装依赖（pnpm install，通常需要 10~30 分钟，请耐心等待）…'
-    Write-SetupLog ''
-    Write-SetupLog '========================================'
-    Write-SetupLog '第 2 步：安装依赖（pnpm install）'
-    Write-SetupLog '========================================'
-    Write-SetupLog '这一步下载量较大，时间取决于网速，请耐心等待。'
-    $dshDir = $script:DshDir
-    $installCmd = "cd /d `"$dshDir`" && pnpm install >> `"$($script:SetupLog)`" 2>&1"
-    $script:Proc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', $installCmd -WindowStyle Hidden -PassThru
+    $deps = Install-DshDeps -DshDir $script:DshDir
+    if (-not $deps.ok) {
+        $installStatus.Text = '❌ ' + $deps.error
+        $script:Phase = 'failed'
+        $script:PhaseError = $deps.error
+        return
+    }
+    $script:Proc = $deps.proc
+    $tickTimer.Start()
+}
+
+# 构建（pnpm run build，官方流程的一步）
+function Begin-BuildPhase {
+    $script:Phase = 'building'
+    $installStatus.Text = '正在构建 DSH（pnpm run build，需要几分钟，请耐心等待）…'
+    $script:Proc = Start-DshBuild -DshDir $script:DshDir
     $tickTimer.Start()
 }
 
@@ -879,9 +693,9 @@ function Finish-Install {
     $script:Phase = 'finishing'
     $installStatus.Text = '正在安装 Orca 插件…'
     Write-SetupLog ''
-    Write-SetupLog '第 3 步：安装 Orca DSH Launcher 插件'
+    Write-SetupLog '第 4 步：安装 Orca DSH Launcher 插件'
     try {
-        Install-Plugin -PluginSource $script:pluginSource -DshDir $script:DshDir | Out-Null
+        Install-OrcaPlugin -PluginSource $script:pluginSource -DshDir $script:DshDir | Out-Null
         $targetDir = Join-Path $env:USERPROFILE '.dsh\profiles\web\node_modules\orca-dsh-launcher'
         New-DesktopShortcut -PluginTargetDir $targetDir | Out-Null
         Write-SetupLog '[插件] 桌面图标已创建'
@@ -929,11 +743,24 @@ $tickTimer.Add_Tick({
     } elseif ($script:Phase -eq 'installing') {
         if ($script:Proc.ExitCode -eq 0) {
             $installStatus.Text = '✅ 依赖安装完成'
-            Finish-Install
+            Begin-BuildPhase
         } else {
             $script:Phase = 'failed'
             $script:PhaseError = '依赖安装失败（退出码 ' + $script:Proc.ExitCode + '），请查看上方日志。常见原因：网络中断、磁盘空间不足。'
             $installStatus.Text = '❌ 依赖安装失败'
+            $installStatus.Foreground = $window.Resources['ColorErrFg']
+            $btnCancelInstall.IsEnabled = $false
+            $btnInstallNext.IsEnabled = $true
+            $tickTimer.Stop()
+        }
+    } elseif ($script:Phase -eq 'building') {
+        if ($script:Proc.ExitCode -eq 0) {
+            $installStatus.Text = '✅ 构建完成'
+            Finish-Install
+        } else {
+            $script:Phase = 'failed'
+            $script:PhaseError = '构建 DSH 失败（退出码 ' + $script:Proc.ExitCode + '），请查看上方日志。常见原因：磁盘空间不足、Node 版本过旧。'
+            $installStatus.Text = '❌ 构建失败'
             $installStatus.Foreground = $window.Resources['ColorErrFg']
             $btnCancelInstall.IsEnabled = $false
             $btnInstallNext.IsEnabled = $true

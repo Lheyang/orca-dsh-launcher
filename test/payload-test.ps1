@@ -46,6 +46,7 @@ try {
         (Join-Path $tmp 'plugin.js'),
         (Join-Path $tmp 'package.json'),
         (Join-Path $tmp 'orca\orca-common.ps1'),
+        (Join-Path $tmp 'orca\orca-install.ps1'),
         (Join-Path $tmp 'orca\dsh-tray.ps1'),
         (Join-Path $tmp 'orca\dsh-console.ps1'),
         (Join-Path $tmp 'orca\dsh-tray.ico'),

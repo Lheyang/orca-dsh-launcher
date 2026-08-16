@@ -291,8 +291,8 @@ async function getCommandVersion(command) {
 /** 启动 DSH 服务器（隐藏窗口运行 pnpm dsh web，和托盘行为一致）
  *  返回 { ok, error }，让调用方能告诉用户具体失败原因 */
 function startServer(cfg) {
-  if (!existsSync(cfg.dshDir)) {
-    return { ok: false, error: 'DSH 目录不存在：' + cfg.dshDir + '（请到控制台设置里检查）' }
+  if (!existsSync(cfg.dshDir) || !existsSync(join(cfg.dshDir, 'package.json'))) {
+    return { ok: false, error: '电脑上未安装 DSH（' + cfg.dshDir + ' 不存在）。请打开 Orca 控制台「安装」页一键安装，或直接启动官方 Web 版：npx @deepseek-ai/dsh web' }
   }
   try {
     const child = spawn('cmd.exe', ['/c', 'pnpm dsh web'], {
@@ -439,7 +439,12 @@ async function orcaHandler(invocation, ctx) {
         lines.push('⚠️ 端口 ' + cfg.port + ' 被其他程序占用：' + (owner.name || ('PID ' + owner.pid)))
         lines.push('   当前不是 DSH 在运行，请先处理占用。')
       } else {
-        lines.push('○ DSH 服务器：未运行')
+        if (!existsSync(join(cfg.dshDir, 'package.json'))) {
+          lines.push('○ DSH 服务器：未运行（电脑上未安装 DSH：' + cfg.dshDir + '）')
+          lines.push('   请打开 Orca 控制台「安装」页一键安装，或直接启动官方 Web 版：npx @deepseek-ai/dsh web')
+        } else {
+          lines.push('○ DSH 服务器：未运行')
+        }
       }
       if (last) {
         lines.push(last.hasUpdate

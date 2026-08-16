@@ -2,16 +2,18 @@
 #  Orca DSH Launcher - 控制台（独立管理窗口 · WPF 导航式界面）
 # ============================================================
 #  双击桌面图标「Orca DSH Launcher」打开本窗口：
-#    - 左侧导航：概览 / 服务器 / 日志 / 设置 / 关于
+#    - 左侧导航：概览 / 服务器 / 安装 / 日志 / 设置 / 关于
 #    - 概览页：健康检查式状态卡片（服务器 / 更新 / 托盘）
 #    - 服务器页：启动 / 关闭 / 重启 + 状态信息 + 端口占用检测
+#    - 安装页：一键安装完整版 DSH / 启动官方 Web 版 / 打开官网
 #    - 日志页：实时查看 DSH 运行日志
 #    - 设置页：端口 / DSH 目录 / 自启开关 / 主题（深色/浅色）
 #  深色主题（仿 Codex++ 风格）；支持浅色主题切换（设置页）
 #  窗口是独立软件界面（WPF，Windows 自带框架），不依赖浏览器；
 #  DSH 没启动也能打开。
 #
-#  公共逻辑在 orca-common.ps1，本文件只管界面。
+#  公共逻辑在 orca-common.ps1（启停/状态）+ orca-install.ps1（安装），
+#  本文件只管界面。
 #  参数：-QuickCheck 只输出状态 JSON 后退出（供测试/自检用）
 #  注意：本文件必须保存为 UTF-8 带 BOM（PowerShell 5.1 才能
 #        正确解析中文）。
@@ -21,6 +23,10 @@ $ErrorActionPreference = 'Continue'
 # 加载公共逻辑库（配置、服务器启停、更新检查、窗口辅助、图标）
 . (Join-Path $PSScriptRoot 'orca-common.ps1')
 Initialize-OrcaCommon
+
+# 加载安装核心逻辑库（环境/网络检测、git clone、pnpm install+build、
+# npx web 启动、装插件）——「安装」页与独立安装向导共用同一份
+. (Join-Path $PSScriptRoot 'orca-install.ps1')
 
 # ---------- 自检模式：不弹窗口，输出状态后退出 ----------
 if ($args -contains '-QuickCheck') {
@@ -36,6 +42,7 @@ if ($args -contains '-QuickCheck') {
             trayAutoStart = $script:orcaCfgTrayAutoStart
             theme         = $script:orcaCfgTheme
             dshAutoStart  = Test-DshAutoStart
+            dshInstalled  = Test-DshInstalled -DshDir $script:orcaCfgDshDir
             updateOk      = $result.ok
             hasUpdate     = $result.hasUpdate
             localCommit   = $result.localCommit
@@ -310,6 +317,7 @@ $script:pendingStart = $false    # 正在启动服务器
               <TextBlock Text="管理控制台" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="20,0,0,8"/>
               <Button x:Name="navOverview" Style="{StaticResource NavButton}" Content="📊  概览"/>
               <Button x:Name="navServer"   Style="{StaticResource NavButton}" Content="🖥️  服务器"/>
+              <Button x:Name="navInstall"  Style="{StaticResource NavButton}" Content="📦  安装"/>
               <Button x:Name="navLogs"     Style="{StaticResource NavButton}" Content="📄  日志"/>
               <Button x:Name="navSettings" Style="{StaticResource NavButton}" Content="⚙️  设置"/>
               <Button x:Name="navAbout"    Style="{StaticResource NavButton}" Content="ℹ️  关于"/>
@@ -440,6 +448,45 @@ $script:pendingStart = $false    # 正在启动服务器
               </StackPanel>
             </StackPanel>
 
+            <!-- ═══ 安装页 ═══ -->
+            <StackPanel x:Name="pageInstall" CacheMode="BitmapCache" Visibility="Collapsed">
+              <TextBlock Text="安装 DSH" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
+              <TextBlock Text="电脑上还没有 DSH？这里一键搞定，两条路任选" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
+
+              <TextBlock Text="安装状态" FontSize="14" Foreground="{DynamicResource ColorTextPrimary}" Margin="0,18,0,0"/>
+              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,12" Margin="0,8,0,0">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="installCardIcon" Text="○" FontSize="16" Foreground="{DynamicResource ColorTextMuted}" VerticalAlignment="Center"/>
+                  <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="DSH 完整版" FontSize="13" Foreground="{DynamicResource ColorTextPrimary}"/>
+                    <TextBlock x:Name="installCardSub" Text="检测中…" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <Border Grid.Column="2" Style="{StaticResource StatusTag}">
+                    <TextBlock x:Name="installCardTag" Text="…" FontSize="11" Foreground="{DynamicResource ColorTagNeutralFg}"/>
+                  </Border>
+                </Grid>
+              </Border>
+              <TextBlock x:Name="installHelp" Text="方式一：完整版（适合长期使用，自动下载官方源码并安装，约 20~40 分钟）；方式二：官方 Web 版（只需 Node.js，一条命令秒开，适合先体验）。" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+
+              <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                <Button x:Name="btnInstallFull" Content="一键安装完整版" Style="{StaticResource PrimaryButton}" Width="160" Height="36"/>
+                <Button x:Name="btnInstallWeb" Content="启动官方 Web 版" Style="{StaticResource SecondaryButton}" Width="140" Height="36" Margin="10,0,0,0"/>
+                <Button x:Name="btnOpenSite" Content="打开 DSH 官网" Style="{StaticResource SecondaryButton}" Width="120" Height="36" Margin="10,0,0,0"/>
+              </StackPanel>
+
+              <TextBlock x:Name="installStatus" Text="" FontSize="12" Foreground="{DynamicResource ColorAccent}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+              <TextBox x:Name="txtInstallLog" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
+                       Background="#12141C" Foreground="#D0D7E5" BorderBrush="#2A2D42" BorderThickness="1"
+                       Padding="10,8" TextWrapping="NoWrap" AcceptsReturn="True"
+                       VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                       Height="160" Margin="0,10,0,0" Visibility="Collapsed"/>
+            </StackPanel>
+
             <!-- ═══ 日志页 ═══ -->
             <StackPanel x:Name="pageLogs" CacheMode="BitmapCache" Visibility="Collapsed">
               <TextBlock Text="日志" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
@@ -532,11 +579,13 @@ $btnMin     = $window.FindName('btnMin')
 $btnClose   = $window.FindName('btnClose')
 $navOverview= $window.FindName('navOverview')
 $navServer  = $window.FindName('navServer')
+$navInstall = $window.FindName('navInstall')
 $navLogs    = $window.FindName('navLogs')
 $navSettings= $window.FindName('navSettings')
 $navAbout   = $window.FindName('navAbout')
 $pageOverview=$window.FindName('pageOverview')
 $pageServer = $window.FindName('pageServer')
+$pageInstall=$window.FindName('pageInstall')
 $pageLogs   = $window.FindName('pageLogs')
 $pageSettings=$window.FindName('pageSettings')
 $pageAbout  = $window.FindName('pageAbout')
@@ -555,6 +604,15 @@ $btnOpenServer = $window.FindName('btnOpenServer')
 $btnStartServer= $window.FindName('btnStartServer')
 $btnStopServer = $window.FindName('btnStopServer')
 $btnRestartServer = $window.FindName('btnRestartServer')
+$installCardIcon = $window.FindName('installCardIcon')
+$installCardSub  = $window.FindName('installCardSub')
+$installCardTag  = $window.FindName('installCardTag')
+$installHelp     = $window.FindName('installHelp')
+$btnInstallFull  = $window.FindName('btnInstallFull')
+$btnInstallWeb   = $window.FindName('btnInstallWeb')
+$btnOpenSite     = $window.FindName('btnOpenSite')
+$installStatus   = $window.FindName('installStatus')
+$txtInstallLog   = $window.FindName('txtInstallLog')
 $infoStatus  = $window.FindName('infoStatus')
 $infoPort    = $window.FindName('infoPort')
 $infoDir     = $window.FindName('infoDir')
@@ -652,6 +710,7 @@ function Show-Page([string]$name) {
     $pages = @{
         overview = $pageOverview
         server   = $pageServer
+        install  = $pageInstall
         logs     = $pageLogs
         settings = $pageSettings
         about    = $pageAbout
@@ -662,6 +721,7 @@ function Show-Page([string]$name) {
     $navs = @{
         overview = $navOverview
         server   = $navServer
+        install  = $navInstall
         logs     = $navLogs
         settings = $navSettings
         about    = $navAbout
@@ -677,12 +737,14 @@ function Show-Page([string]$name) {
             $navs[$k].FontWeight = 'Normal'
         }
     }
-    # 进入日志页时立即刷一次
+    # 进入日志页时立即刷一次；进入安装页时刷新安装状态卡
     if ($name -eq 'logs') { Update-LogDisplay }
+    if ($name -eq 'install') { Update-InstallCard }
 }
 
 $navOverview.Add_Click({ Show-Page 'overview' })
 $navServer.Add_Click({ Show-Page 'server' })
+$navInstall.Add_Click({ Show-Page 'install' })
 $navLogs.Add_Click({ Show-Page 'logs' })
 $navSettings.Add_Click({ Show-Page 'settings' })
 $navAbout.Add_Click({ Show-Page 'about' })
@@ -734,18 +796,35 @@ function Update-StatusDisplay {
             $btnRestartServer.IsEnabled = $false
             $btnRestartServer.Content = '重启服务器'
         } else {
-            $cardServerTag.Text = '未运行'
-            $cardServerTag.Foreground = $window.Resources['ColorTagNeutralFg']
-            $cardServerTag.Parent.Background = $window.Resources['ColorTagNeutralBg']
-            $cardServerSub.Text = 'http://127.0.0.1:' + $script:orcaCfgPort
-            $infoStatus.Text = 'stopped'
-            $infoStatus.Foreground = $window.Resources['ColorTagNeutralFg']
-            $btnStartServer.IsEnabled = $true
-            $btnStartServer.Content = '启动服务器'
-            $btnStopServer.IsEnabled = $false
-            $btnStopServer.Content = '服务器未运行'
-            $btnRestartServer.IsEnabled = $false
-            $btnRestartServer.Content = '重启服务器'
+            # 端口空闲：区分「已安装未运行」和「未安装」
+            $installed = Test-DshInstalled -DshDir $script:orcaCfgDshDir
+            if (-not $installed) {
+                $cardServerTag.Text = '未安装'
+                $cardServerTag.Foreground = $window.Resources['ColorTagWarnFg']
+                $cardServerTag.Parent.Background = $window.Resources['ColorTagWarnBg']
+                $cardServerSub.Text = '未安装 DSH，请到「安装」页一键安装'
+                $infoStatus.Text = '未安装'
+                $infoStatus.Foreground = $window.Resources['ColorTagWarnFg']
+                $btnStartServer.IsEnabled = $false
+                $btnStartServer.Content = '请先安装 DSH'
+                $btnStopServer.IsEnabled = $false
+                $btnStopServer.Content = '服务器未运行'
+                $btnRestartServer.IsEnabled = $false
+                $btnRestartServer.Content = '重启服务器'
+            } else {
+                $cardServerTag.Text = '未运行'
+                $cardServerTag.Foreground = $window.Resources['ColorTagNeutralFg']
+                $cardServerTag.Parent.Background = $window.Resources['ColorTagNeutralBg']
+                $cardServerSub.Text = 'http://127.0.0.1:' + $script:orcaCfgPort
+                $infoStatus.Text = 'stopped'
+                $infoStatus.Foreground = $window.Resources['ColorTagNeutralFg']
+                $btnStartServer.IsEnabled = $true
+                $btnStartServer.Content = '启动服务器'
+                $btnStopServer.IsEnabled = $false
+                $btnStopServer.Content = '服务器未运行'
+                $btnRestartServer.IsEnabled = $false
+                $btnRestartServer.Content = '重启服务器'
+            }
         }
         $infoPort.Text = [string]$script:orcaCfgPort
         $infoDir.Text = $script:orcaCfgDshDir
@@ -792,6 +871,34 @@ function Update-StatusDisplay {
             $cardUpdateSub.Text = '点「检查更新」查看'
             $infoChecked.Text = '—'
         }
+        # 安装页卡片状态
+        Update-InstallCard
+    } catch {}
+}
+
+# ---------- 刷新安装页卡片 ----------
+function Update-InstallCard {
+    try {
+        $installed = Test-DshInstalled -DshDir $script:orcaCfgDshDir
+        if ($installed) {
+            $installCardIcon.Text = '✓'
+            $installCardIcon.Foreground = $window.Resources['ColorTagOkFg']
+            $installCardSub.Text = $script:orcaCfgDshDir
+            $installCardTag.Text = '已安装'
+            $installCardTag.Foreground = $window.Resources['ColorTagOkFg']
+            $installCardTag.Parent.Background = $window.Resources['ColorTagOkBg']
+            $btnInstallFull.IsEnabled = $false
+            $btnInstallFull.Content = '已安装 ✓'
+        } else {
+            $installCardIcon.Text = '○'
+            $installCardIcon.Foreground = $window.Resources['ColorTagWarnFg']
+            $installCardSub.Text = '尚未安装，点下方按钮一键安装'
+            $installCardTag.Text = '未安装'
+            $installCardTag.Foreground = $window.Resources['ColorTagWarnFg']
+            $installCardTag.Parent.Background = $window.Resources['ColorTagWarnBg']
+            $btnInstallFull.IsEnabled = $true
+            $btnInstallFull.Content = '一键安装完整版'
+        }
     } catch {}
 }
 
@@ -808,6 +915,11 @@ function Update-LogDisplay {
 $btnOpenOverview.Add_Click({
     try {
         $status = Get-PortStatus
+        if ($status -eq 'free' -and -not (Test-DshInstalled -DshDir $script:orcaCfgDshDir)) {
+            $lblStatus.Text = '⚠️ 未安装 DSH，请到「安装」页一键安装，或直接启动官方 Web 版'
+            Show-Page 'install'
+            return
+        }
         if ($status -eq 'occupied') {
             $lblStatus.Text = '⚠️ 端口 ' + $script:orcaCfgPort + ' 被其他程序占用，无法启动 DSH'
             return
@@ -894,6 +1006,11 @@ $btnUpdateDsh.Add_Click({
 $btnOpenServer.Add_Click({
     try {
         $status = Get-PortStatus
+        if ($status -eq 'free' -and -not (Test-DshInstalled -DshDir $script:orcaCfgDshDir)) {
+            $lblStatus.Text = '⚠️ 未安装 DSH，请到「安装」页一键安装，或直接启动官方 Web 版'
+            Show-Page 'install'
+            return
+        }
         if ($status -eq 'occupied') {
             $lblStatus.Text = '⚠️ 端口 ' + $script:orcaCfgPort + ' 被其他程序占用，无法启动 DSH'
             return
@@ -920,6 +1037,11 @@ $btnOpenServer.Add_Click({
 $btnStartServer.Add_Click({
     try {
         $status = Get-PortStatus
+        if ($status -eq 'free' -and -not (Test-DshInstalled -DshDir $script:orcaCfgDshDir)) {
+            $lblStatus.Text = '⚠️ 未安装 DSH，请到「安装」页一键安装，或直接启动官方 Web 版'
+            Show-Page 'install'
+            return
+        }
         if ($status -eq 'occupied') {
             $owner = Get-PortOwner
             $ownerName = if ($owner) { $owner.Name } else { '未知程序' }
@@ -994,6 +1116,197 @@ $btnRestartServer.Add_Click({
         }
     } catch {
         $lblStatus.Text = '操作出错：' + $_.Exception.Message
+    }
+})
+
+# ---------- 操作按钮（安装页） ----------
+$script:InstallPhase = 'idle'       # idle/cloning/installing/building/finishing/done/failed
+$script:InstallProc = $null
+$script:InstallDshDir = ''
+$script:PendingWebOpen = $false             # 官方 Web 版就绪后自动打开
+$script:PendingStartAfterInstall = $false   # 安装完成后自动启动完整版
+
+# 打开 DSH 官网（官方 GitHub 仓库，能看到官方文档与 Web 版说明）
+$btnOpenSite.Add_Click({
+    try { Start-Process 'https://github.com/deepseek-ai/deepseek-harness' } catch {}
+})
+
+# 启动官方 Web 版（npx @deepseek-ai/dsh web，无需本地安装）
+$btnInstallWeb.Add_Click({
+    try {
+        $status = Get-PortStatus
+        if ($status -eq 'running') {
+            Start-Process "http://127.0.0.1:$($script:orcaCfgPort)"
+            $installStatus.Text = 'DSH 已在运行，已为你打开界面'
+            return
+        }
+        if ($status -eq 'occupied') {
+            $owner = Get-PortOwner
+            $ownerName = if ($owner) { $owner.Name } else { '其他程序' }
+            $installStatus.Text = '⚠️ 端口 ' + $script:orcaCfgPort + ' 被 ' + $ownerName + ' 占用，请先处理'
+            return
+        }
+        $btnInstallWeb.IsEnabled = $false
+        $txtInstallLog.Visibility = 'Visible'
+        $installStatus.Text = '正在启动官方 Web 版（首次运行会自动下载官方包，请稍候）…'
+        $r = Start-DshWebNpx -Port $script:orcaCfgPort
+        if (-not $r.ok) {
+            $installStatus.Text = '❌ ' + $r.error
+            $btnInstallWeb.IsEnabled = $true
+            return
+        }
+        $script:PendingWebOpen = $true
+    } catch {
+        $installStatus.Text = '操作出错：' + $_.Exception.Message
+        $btnInstallWeb.IsEnabled = $true
+    }
+})
+
+# 一键安装完整版（环境 → 网络 → 选目录 → clone → install → build → 装插件）
+$btnInstallFull.Add_Click({
+    try {
+        if ($script:InstallPhase -in @('cloning','installing','building','finishing')) {
+            [System.Windows.MessageBox]::Show('安装正在进行中，请稍候。', 'Orca DSH Launcher', 'OK', 'Information') | Out-Null
+            return
+        }
+        # 1) 环境检测
+        $installStatus.Text = '① 正在检查电脑环境…'
+        $envResult = Test-NodeEnv
+        if (-not $envResult.ok) {
+            $msg = '还缺少以下软件：' + "`n" + ($envResult.missing -join "`n") + "`n`n" + '装好后再来点「一键安装完整版」。'
+            [System.Windows.MessageBox]::Show($msg, '缺少环境', 'OK', 'Warning') | Out-Null
+            $installStatus.Text = '缺少环境，请先安装所需软件'
+            return
+        }
+        # 2) 网络检测
+        $installStatus.Text = '② 正在检测网络（能否访问 GitHub）…'
+        [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background)
+        $netResult = Test-GithubNetwork
+        if (-not $netResult.githubOk) {
+            $msg = '当前网络无法访问 GitHub，下载可能会失败。' + "`n" + '检查结果：' + $netResult.detail + "`n`n" + '建议：检查代理/VPN 设置，或更换网络后再试。' + "`n" + '如果确认网络没问题，可以点「是」继续尝试。'
+            $ans = [System.Windows.MessageBox]::Show($msg, '网络不可用', 'YesNo', 'Warning')
+            if ($ans -ne 'Yes') { $installStatus.Text = '已取消安装'; return }
+        }
+        # 3) 选择安装位置
+        $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dlg.Description = '选择 DSH 要安装到的文件夹（会自动创建 deepseek-harness 子文件夹）'
+        $dlg.ShowNewFolderButton = $true
+        if ($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        $script:InstallDshDir = Join-Path $dlg.SelectedPath 'deepseek-harness'
+        $installStatus.Text = '安装位置：' + $script:InstallDshDir
+        # 4) 开始安装
+        $txtInstallLog.Visibility = 'Visible'
+        try { Remove-Item $script:InstallLogFile -Force -ErrorAction SilentlyContinue } catch {}
+        $btnInstallFull.IsEnabled = $false
+        $script:InstallPhase = 'idle'
+        Start-ConsoleInstall
+    } catch {
+        $installStatus.Text = '操作出错：' + $_.Exception.Message
+        $btnInstallFull.IsEnabled = $true
+    }
+})
+
+# 控制台版安装状态机（与独立向导同一套逻辑，只差界面）
+function Start-ConsoleInstall {
+    $clone = Install-DshClone -DshDir $script:InstallDshDir
+    if (-not $clone.ok) {
+        $installStatus.Text = '❌ ' + $clone.error
+        $script:InstallPhase = 'failed'
+        $btnInstallFull.IsEnabled = $true
+        return
+    }
+    if ($null -ne $clone.proc) {
+        $script:InstallPhase = 'cloning'
+        $installStatus.Text = '正在下载 DSH 源码（git clone，取决于网速）…'
+        $script:InstallProc = $clone.proc
+        $installTimer.Start()
+        return
+    }
+    Start-ConsoleDeps
+}
+
+function Start-ConsoleDeps {
+    $script:InstallPhase = 'installing'
+    $installStatus.Text = '正在安装依赖（pnpm install，通常 10~30 分钟，请耐心等待）…'
+    $deps = Install-DshDeps -DshDir $script:InstallDshDir
+    if (-not $deps.ok) {
+        $installStatus.Text = '❌ ' + $deps.error
+        $script:InstallPhase = 'failed'
+        $btnInstallFull.IsEnabled = $true
+        return
+    }
+    $script:InstallProc = $deps.proc
+    $installTimer.Start()
+}
+
+function Start-ConsoleBuild {
+    $script:InstallPhase = 'building'
+    $installStatus.Text = '正在构建 DSH（pnpm run build，需要几分钟）…'
+    $script:InstallProc = Start-DshBuild -DshDir $script:InstallDshDir
+    $installTimer.Start()
+}
+
+function Finish-ConsoleInstall {
+    $script:InstallPhase = 'finishing'
+    $installStatus.Text = '正在安装 Orca 插件…'
+    $src = Get-PluginSource -FallbackDir (Split-Path -Parent $PSScriptRoot)
+    if ($src) {
+        Install-OrcaPlugin -PluginSource $src -DshDir $script:InstallDshDir | Out-Null
+        $targetDir = Join-Path $env:USERPROFILE '.dsh\profiles\web\node_modules\orca-dsh-launcher'
+        New-DesktopShortcut -PluginTargetDir $targetDir | Out-Null
+    }
+    # 更新内存配置指向新装的 DSH（不写盘，重启控制台后由配置文件接管）
+    $script:orcaCfgDshDir = $script:InstallDshDir
+    $script:InstallPhase = 'done'
+    $installStatus.Text = '✅ 安装完成！正在启动 DSH…'
+    $btnInstallFull.IsEnabled = $true
+    $installTimer.Stop()
+    Update-StatusDisplay
+    $script:PendingStartAfterInstall = $true
+}
+
+# 安装进度定时器（800ms）
+$installTimer = New-Object System.Windows.Threading.DispatcherTimer
+$installTimer.Interval = [TimeSpan]::FromMilliseconds(800)
+$installTimer.Add_Tick({
+    # 刷新日志
+    $lines = Get-SetupLogTail -Lines 60
+    if ($lines.Count -gt 0) {
+        $txtInstallLog.Text = ($lines -join "`n")
+        $txtInstallLog.ScrollToEnd()
+    }
+    # 进程还在跑 → 等下一轮
+    if ($script:InstallProc -and -not $script:InstallProc.HasExited) { return }
+
+    if ($script:InstallPhase -eq 'cloning') {
+        if ($script:InstallProc.ExitCode -eq 0) {
+            $installStatus.Text = '✅ 源码下载完成，开始装依赖…'
+            Start-ConsoleDeps
+        } else {
+            $script:InstallPhase = 'failed'
+            $installStatus.Text = '❌ 下载失败（退出码 ' + $script:InstallProc.ExitCode + '），请查看日志并检查网络'
+            $btnInstallFull.IsEnabled = $true
+            $installTimer.Stop()
+        }
+    } elseif ($script:InstallPhase -eq 'installing') {
+        if ($script:InstallProc.ExitCode -eq 0) {
+            $installStatus.Text = '✅ 依赖安装完成，开始构建…'
+            Start-ConsoleBuild
+        } else {
+            $script:InstallPhase = 'failed'
+            $installStatus.Text = '❌ 依赖安装失败（退出码 ' + $script:InstallProc.ExitCode + '），请查看日志（常见原因：网络中断、磁盘空间不足）'
+            $btnInstallFull.IsEnabled = $true
+            $installTimer.Stop()
+        }
+    } elseif ($script:InstallPhase -eq 'building') {
+        if ($script:InstallProc.ExitCode -eq 0) {
+            Finish-ConsoleInstall
+        } else {
+            $script:InstallPhase = 'failed'
+            $installStatus.Text = '❌ 构建失败（退出码 ' + $script:InstallProc.ExitCode + '），请查看日志'
+            $btnInstallFull.IsEnabled = $true
+            $installTimer.Stop()
+        }
     }
 })
 
@@ -1089,6 +1402,22 @@ $refreshTimer.Add_Tick({
             [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background)
             Open-DshUi
             $lblStatus.Text = 'DSH 界面已打开'
+        }
+        # 官方 Web 版等待就绪后自动打开界面
+        if ($script:PendingWebOpen -and (Test-ServerRunning)) {
+            $script:PendingWebOpen = $false
+            $btnInstallWeb.IsEnabled = $true
+            Start-Process "http://127.0.0.1:$($script:orcaCfgPort)"
+            $installStatus.Text = '✅ 官方 Web 版已启动，已打开界面'
+        }
+        # 完整版安装完成后自动启动
+        if ($script:PendingStartAfterInstall -and -not (Test-ServerRunning)) {
+            $r = Start-DshFromDir -DshDir $script:InstallDshDir -Port $script:orcaCfgPort
+            if ($r.ok) {
+                $script:PendingStartAfterInstall = $false
+                $lblStatus.Text = '正在启动 DSH…'
+                $script:pendingOpen = $true
+            }
         }
     } catch {} finally {
         $script:refreshBusy = $false

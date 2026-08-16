@@ -164,6 +164,11 @@ function Start-DshServer {
         $script:orcaLastServerError = "端口 $($script:orcaCfgPort) 被 $ownerName 占用（非 DSH），不能启动"
         return $false
     }
+    # 未安装 DSH（目录不存在或没有 package.json）→ 明确提示，别静默失败
+    if (-not (Test-Path (Join-Path $script:orcaCfgDshDir 'package.json'))) {
+        $script:orcaLastServerError = "未安装 DSH（找不到 $($script:orcaCfgDshDir)）。请到控制台「安装」页一键安装，或直接启动官方 Web 版。"
+        return $false
+    }
     try {
         # 日志轮转（防无限增长）
         Rotate-ServerLog

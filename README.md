@@ -1,168 +1,147 @@
 # 🐋 Orca DSH Launcher
 
-> 为 **DeepSeek Harness (DSH)** 打造的一站式助手：帮你检查更新、开关服务器、常驻托盘、图形化管理，还能在全新电脑上**一键装好 DSH**。
-
 ![版本](https://img.shields.io/badge/版本-v1.6.0-36D199) ![平台](https://img.shields.io/badge/平台-Windows-0078D6) ![许可证](https://img.shields.io/badge/许可证-MIT-green)
 
----
+为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) 提供更新检查、服务器启停、系统托盘、图形控制台与一键安装引导的 **Cordis 插件 + 桌面端组件**。
 
-## 这是什么？
+## 特性
 
-DeepSeek Harness（简称 DSH）是一个开源项目，但安装和使用对新手不太友好——要敲命令、查端口、看日志。
+- **更新检查**：DSH 启动时对比本地 git 提交号与官方 `master` 分支，有更新记日志 + 通知。**只查询，绝不自动更新。**
+- **`/orca` 命令集**：14 个子命令，覆盖状态 / 启停 / 重启 / 日志 / 端口 / 配置 / 诊断 / 托盘 / 控制台。
+- **系统托盘**：WinForms `NotifyIcon`，左键打开界面，右键菜单启停服务器、检查更新。
+- **图形控制台**：WPF 管理窗口（概览 / 服务器 / **安装** / 日志 / 设置 / 关于），深/浅主题，DSH 未启动也能打开。
+- **一键安装**：控制台「安装」页或独立向导 `orca-setup`（EXE 单文件分发），支持两条路径——
+  - 完整版：`git clone` + `pnpm install` + `pnpm run build` + `pnpm dsh web`；
+  - 官方 Web 版：`npx @deepseek-ai/dsh web`（只需 Node.js）。
+- **未安装引导**：未安装 DSH 时，状态卡片与启动/打开按钮明确提示，并引导至安装页，不再静默失败。
 
-**Orca DSH Launcher** 就是来解决这个问题的。它把 DSH 常用操作做成了「点一下就行」：
+## 安装
 
-| 能力 | 有什么用 |
-|---|---|
-| 🚀 一键安装 DSH | 全新电脑上双击一个程序，自动帮你下载安装最新版 DSH（自动检测网络、可自选安装位置） |
-| 🔔 更新检查 | 每次启动 DSH 自动对比官方最新版本，有更新就提醒你（只提醒，绝不偷偷更新） |
-| ▶️ 服务器开关 | 在聊天框里输入命令，就能启动/关闭 DSH、打开网页界面 |
-| 🐳 系统托盘 | 右下角一只虎鲸，点一下开界面，右键菜单开关服务器、检查更新 |
-| 🖥️ 图形控制台 | 一个独立的管理窗口，看状态、看日志、改设置，DSH 没开也能打开 |
+### 快速体验 DSH（官方 Web 版，无需本插件）
 
-> ⚠️ 一个原则：**只检查、只提醒，绝不自动更新你的 DSH**。要不要更新、什么时候更新，永远由你自己决定。
-
----
-
-## 🚀 快速开始
-
-### 方式一：一键安装（推荐，适合没装过 DSH 的电脑）
-
-1. 去本项目的 **Releases** 页面下载 `orca-setup.exe`
-2. 双击运行，按提示操作：
-   - 程序会先检查你的电脑环境（需要 Node.js、Git 等，缺什么会告诉你去哪装）
-   - 再检查网络能否访问 GitHub（网络不好的话会明确告诉你原因和解决办法）
-   - 然后让你选择把 DSH 安装到哪个文件夹
-   - 最后自动下载、安装、启动 DSH，并把本插件一起装好
-3. 完成后浏览器会自动打开 DSH 界面
-
-### 方式二：已经装好 DSH，只想装这个插件
-
-1. 下载本仓库代码（点页面右上角绿色 **Code** 按钮 → Download ZIP），解压
-2. 双击运行 `scripts\install.ps1`
-3. 重启 DSH，完成
-
-> 装好之后，桌面会出现一个「Orca DSH Launcher」图标，双击可以打开管理窗口。
-
----
-
-## 🎮 使用方法
-
-### 在 DSH 聊天框里输入命令
-
-| 命令 | 作用 |
-|---|---|
-| `/orca 状态` | 查看服务器、端口、更新状态 |
-| `/orca 检查` | 立即检查是否有新版本 |
-| `/orca 启动` | 启动 DSH 服务器 |
-| `/orca 关闭` | 关闭 DSH 服务器 |
-| `/orca 重启` | 一键重启 DSH 服务器 |
-| `/orca 打开` | 打开 DSH 网页界面（没启动会自动先启动） |
-| `/orca 日志` | 查看最近运行日志 |
-| `/orca 端口` | 查看端口占用情况 |
-| `/orca 配置` | 查看当前配置 |
-| `/orca 诊断` | 一键检查电脑环境是否健康 |
-| `/orca 控制台` | 打开图形管理窗口 |
-| `/orca 托盘` | 启动系统托盘 |
-| `/orca 关闭托盘` | 关闭系统托盘 |
-| `/orca 帮助` | 显示帮助 |
-
-也可以输入英文：`/orca status`、`/orca start`、`/orca stop`……
-
-### 系统托盘（右下角虎鲸图标）
-
-- **左键**：打开 DSH 网页界面
-- **右键菜单**：打开界面 / 打开控制台 / 检查更新 / 启动服务器 / 关闭服务器 / 退出
-
-### 图形控制台（独立管理窗口）
-
-- **概览**：一眼看到服务器、更新、托盘三个状态
-- **服务器**：启动 / 关闭 / 重启，端口被占用了会明确告诉你是谁占的
-- **日志**：实时查看 DSH 运行日志
-- **设置**：端口、DSH 目录、开机自启、深色/浅色主题
-- **关于**：版本和使用统计
-
----
-
-## ⚙️ 配置文件
-
-配置文件在 `C:\Users\你的用户名\.dsh\orca-dsh-launcher.json`，一般不需要手动改（控制台里可以改）：
-
-```json
-{
-  "dshDir": "D:\\deepseek harness",
-  "port": 3080,
-  "repo": "deepseek-ai/deepseek-harness",
-  "branch": "master",
-  "checkTimeoutMs": 8000,
-  "trayAutoStart": true,
-  "theme": "dark"
-}
+```sh
+npx @deepseek-ai/dsh web
 ```
 
-| 字段 | 含义 | 默认值 |
+### 安装本插件（已有 DSH）
+
+```powershell
+# 克隆仓库后执行
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+# 重启 DSH 生效
+```
+
+脚本行为：复制运行文件至 `~/.dsh/profiles/web/node_modules/orca-dsh-launcher/` → 在 `cordis.patch.yml` 末尾追加 insert 登记（UTF-8 无 BOM）→ 自动迁移旧版 `dsh-update-checker` → 创建开机自启托盘快捷方式与桌面图标（可用 `-SkipStartupShortcut` / `-SkipDesktopShortcut` 跳过）。
+
+卸载：`scripts\uninstall.ps1`（自动备份，`-KillTray` 顺带关托盘，`-KeepShortcut` 保留自启）。
+
+### 一键安装 DSH（全新电脑）
+
+- **方式一**：GitHub Releases 下载 `orca-setup.exe` 双击运行（内嵌插件包，单文件分发）。
+- **方式二**：安装本插件后，打开控制台 →「安装」页，选择「一键安装完整版」或「启动官方 Web 版」。
+
+## 用法
+
+### `/orca` 命令
+
+| 命令 | 说明 | 英文别名 |
 |---|---|---|
-| `dshDir` | DSH 安装在哪里 | `D:\deepseek harness` |
-| `port` | DSH 网页界面端口 | `3080` |
+| `/orca 状态` | 服务器 / 端口 / 更新状态 | `status` |
+| `/orca 检查` | 立即检查更新 | `check` |
+| `/orca 启动` | 启动 DSH 服务器 | `start` |
+| `/orca 关闭` | 关闭 DSH 服务器（非 DSH 进程不误杀） | `stop` |
+| `/orca 重启` | 一键重启 | `restart` |
+| `/orca 打开` | 打开界面（未启动自动先启动） | `open` |
+| `/orca 日志` | 最近运行日志 | `log` |
+| `/orca 端口` | 端口占用详情 | `port` |
+| `/orca 配置` | 当前生效配置 | `config` |
+| `/orca 诊断` | 环境健康检查 | `health` / `diagnose` |
+| `/orca 控制台` | 打开图形控制台 | `console` |
+| `/orca 托盘` / `/orca 关闭托盘` | 启动 / 关闭托盘 | `tray` / `tray-stop` |
+| `/orca 帮助` | 帮助 | `help` |
+
+handler 返回 `{ kind: 'success' | 'error', text }`，每次执行重新读取配置（控制台改设置即时生效）。
+
+### 托盘 / 控制台
+
+- 托盘：左键打开界面；右键菜单含「打开控制台…」「检查更新」「启动/关闭服务器」「日志位置…」。
+- 控制台「安装」页：DSH 完整版安装状态卡 +「一键安装完整版」「启动官方 Web 版」「打开 DSH 官网」三个入口，安装过程实时日志。
+
+## 配置
+
+`~/.dsh/orca-dsh-launcher.json`（纯 ASCII JSON，托盘/控制台/插件共用；首次运行自动生成默认值）：
+
+| 字段 | 含义 | 默认 |
+|---|---|---|
+| `dshDir` | 本地 DSH 源码目录 | `D:\deepseek harness` |
+| `port` | Web 界面端口 | `3080` |
 | `repo` | 官方仓库 | `deepseek-ai/deepseek-harness` |
-| `branch` | 检查的分支 | `master` |
-| `checkTimeoutMs` | 网络查询超时（毫秒） | `8000` |
-| `trayAutoStart` | 启动 DSH 时自动拉起托盘 | `true` |
-| `theme` | 控制台主题（深色/浅色） | `dark` |
+| `branch` | 检查分支 | `master` |
+| `checkTimeoutMs` | 网络查询超时 | `8000` |
+| `trayAutoStart` | DSH 启动时自动拉起托盘 | `true` |
+| `theme` | 控制台主题 | `dark` |
 
----
+用户数据（**勿删**）：`orca-dsh-launcher.json`（配置）、`orca-stats.json`（使用统计，原子写入）、`orca-dsh-server.log`（服务器日志，>2MB 自动轮转）、`update-check-state.json`（更新检查结果）。
 
-## 📦 项目结构
+## 架构
 
 ```
-orca-dsh-launcher/
-├── orca-setup.ps1      ← 一键安装引导器（全新电脑装 DSH 用）
-├── plugin.js           ← 插件本体（更新检查 + 命令 + 拉起托盘/控制台）
-├── package.json        ← 插件身份 + 版本号
-├── orca/               ← 桌面端组件
-│   ├── orca-common.ps1 ← 公共逻辑库（托盘和控制台共用）
-│   ├── dsh-tray.ps1    ← 系统托盘
-│   ├── dsh-console.ps1 ← 图形管理窗口
-│   └── ...（启动器、图标等）
-├── scripts/
-│   ├── install.ps1     ← 一键安装插件到 DSH
-│   ├── uninstall.ps1   ← 一键卸载
-│   ├── test-all.ps1    ← 一键全量测试
-│   └── build-exe.ps1   ← 把引导器打包成 EXE
-└── test/               ← 测试脚本
+plugin.js                Cordis 插件：更新检查 / /orca 命令 / 拉起托盘与控制台
+├── orca\
+│   ├── orca-common.ps1   公共逻辑库：配置 / 启停 / 端口检测 / 统计 / 更新检查（托盘+控制台共用）
+│   ├── orca-install.ps1  安装核心逻辑库：环境与网络检测 / git clone / pnpm install+build /
+│   │                     npx web 启动 / 插件安装（向导+控制台共用）
+│   ├── dsh-tray.ps1      系统托盘（WinForms NotifyIcon）
+│   ├── dsh-console.ps1   图形控制台（WPF 导航界面）
+│   └── start-*.vbs/ps1   隐藏窗口启动器 / 开机自启入口
+├── orca-setup.ps1        独立安装向导（打包为 orca-setup.exe）
+├── scripts\
+│   ├── install.ps1       安装插件到 DSH（复制+登记+自启+桌面图标）
+│   ├── uninstall.ps1     卸载
+│   ├── test-all.ps1      全量测试（7 项）
+│   └── build-exe.ps1     打包引导器 EXE（ps2exe + payload 注入）
+└── test\                 冒烟 / inject / real-cordis / payload 链路测试
 ```
 
----
+### 关键技术点
 
-## 🧑‍💻 开发者指南
+- **Cordis 插件形式**：对象插件 `{ name, inject: ['commands'], apply }`——必须显式声明 inject，否则 `cannot get property "commands" without inject`。
+- **编码约定**：`.ps1` 必须 UTF-8 带 BOM（PowerShell 5.1 按 GBK 解析无 BOM 文件会乱码）；`cordis.patch.yml` 等 JSON/YAML 配置必须用 .NET 方法显式 UTF-8 无 BOM 读写（`Get-Content` 在 PS 5.1 按 GBK 读会乱）。
+- **端口归属判断**：`Get-NetTCPConnection` / `netstat -ano` 取 PID → `Get-CimInstance Win32_Process` 取命令行，正则 `pnpm|dsh|deepseek|harness|tsx` 判断是否 DSH，避免误杀其他 Node 进程。
+- **payload 注入**：`build-exe.ps1` 把插件文件打包成 zip→Base64，替换 `orca-install.ps1` 中 `__PLUGIN_PAYLOAD_B64__` 占位符；运行时解压到临时目录（EXE 单文件分发，离线可装插件）。
+- **进程管理**：安装/启动全部 `Start-Process cmd /c ... >> log 2>&1` 后台运行，UI 用 `DispatcherTimer`（800ms）轮询 `HasExited` + 日志尾部刷新，避免阻塞界面。
 
-### 两份代码，别搞混
+## 开发
 
-- **项目版本**（本仓库）：你下载、修改、发布的代码
-- **运行版本**：电脑上实际被 DSH 加载的代码，位置在 `C:\Users\你的用户名\.dsh\profiles\web\node_modules\orca-dsh-launcher\`
+环境：Windows、PowerShell 5.1、Node.js（测试脚本用 node 加载插件）。
 
-改完代码后，需要把改动同步到运行版本（运行 `scripts\install.ps1` 即可，它会自动备份并覆盖）。
+```powershell
+# 全量测试（7 项：语法 / 插件加载 / 控制台自检 / 托盘自检 / 真实 Cordis 加载 / 引导器自检 / payload 链路）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-all.ps1
 
-### 改完代码必须做的事
+# 打包 EXE（产物 dist\orca-setup.exe，上传 GitHub Releases）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-exe.ps1
+```
 
-1. 运行 `scripts\test-all.ps1` 全量测试（5 项检查全过才行）
-2. 同步到运行版本
-3. 更新 `CHANGELOG.md`
+### 项目版本 vs 运行版本
 
-详细开发规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- **项目版本**：本仓库代码（修改的地方）。
+- **运行版本**：`~/.dsh/profiles/web/node_modules/orca-dsh-launcher/`（DSH 实际加载；`install.ps1` 自动同步并备份）。
 
----
+改代码后：跑 `test-all.ps1` → 跑 `install.ps1` 同步 → 按改动重启 DSH（plugin.js）/ 托盘或控制台（orca\）。详细规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## 📜 许可证
+### 版本号
+
+语义化版本，`package.json` 为唯一来源（托盘/控制台动态读取）。改版本只需：`package.json` + `CHANGELOG.md` + 本 README 顶部 badge。
+
+## 变更记录
+
+[CHANGELOG.md](CHANGELOG.md)
+
+## 许可证
 
 [MIT](LICENSE)
 
 ---
 
-📝 完整更新记录见 [CHANGELOG.md](CHANGELOG.md)
-
----
-
-## 🐳 关于虎鲸
-
-虎鲸（Orca）是海洋里的顶级猎手，聪明、优雅、擅长团队协作——就像这个工具想成为的样子：安静地守护你的 DSH，需要的时候一叫就到。
+**关于虎鲸**：虎鲸（Orca）聪明、优雅、擅长团队协作——这个工具的目标是安静守护你的 DSH，需要时一叫就到。

@@ -10,12 +10,17 @@
 ## [v1.6.0] - 2026-08-16
 
 ### Added
-- **一键安装引导器 `orca-setup.ps1`**：面向全新电脑（没装过 DSH）的图形安装向导——环境检测（Node/Git/pnpm，缺什么给指引）→ 网络检测（GitHub 连通性分档提示，网络差不硬来）→ 自选安装文件夹 → 自动 `git clone` 最新版 DSH → `pnpm install` 装依赖（实时日志）→ 自动安装本插件并创建桌面图标。
+- **一键安装引导器 `orca-setup.ps1`**：面向全新电脑（没装过 DSH）的图形安装向导——环境检测（Node/Git/pnpm，缺什么给指引）→ 网络检测（GitHub 连通性分档提示，网络差不硬来）→ 自选安装文件夹 → 自动 `git clone` 最新版 DSH → `pnpm install` + `pnpm run build` 装依赖（实时日志）→ 自动安装本插件并创建桌面图标。
+- **控制台「安装」页**：图形控制台新增「安装」导航页——DSH 完整版安装状态卡 +「一键安装完整版」「启动官方 Web 版（`npx @deepseek-ai/dsh web`）」「打开 DSH 官网」三个入口，安装过程实时日志。
+- **未安装引导**：未安装 DSH 时，概览/服务器状态卡显示「未安装」，启动/打开按钮明确提示并跳转「安装」页，不再静默失败（插件 `/orca` 命令同步提示）。
 - **EXE 打包**：`scripts/build-exe.ps1` 用 ps2exe 把引导器打成单文件 `dist\orca-setup.exe`（内嵌插件包，虎鲸图标，无控制台窗口），发布到 GitHub Releases 供小白直接下载双击。
 - **payload 链路测试**：`test/payload-test.ps1` 验证插件文件"打包→注入→解压"链路，全量测试扩为 7 项。
-- **仓库开源化整理**：新增 `.gitignore`、`LICENSE`（MIT），README 全面重写为面向非程序员的 GitHub 风格文档（清除内部术语）。
+- **仓库开源化整理**：新增 `.gitignore`、`LICENSE`（MIT），README 全面重写为面向程序员的开发者文档（清除内部术语）。
 
 ### Changed
+- **安装核心逻辑抽为公共库 `orca\orca-install.ps1`**：环境/网络检测、git clone、pnpm install+build、npx web 启动、插件安装，独立向导与控制台共用一份。
+- **修复源码安装流程**：补上官方流程缺失的 `pnpm run build` 步骤（`pnpm install` → `pnpm run build` → `pnpm dsh web`）。
+- **编码规范加固**：托盘/控制台/打包脚本读取 `package.json` 改为 .NET 显式 UTF-8（修复潜在 GBK 乱码）。
 - 全量测试 `test-all.ps1` 由 5 项扩为 7 项（新增引导器自检、payload 链路测试）。
 - README 移除了版本历史章节，统一指向 `CHANGELOG.md`。
 
