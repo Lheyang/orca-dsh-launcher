@@ -485,6 +485,9 @@ $script:pendingStart = $false    # 正在启动服务器
                        Padding="10,8" TextWrapping="NoWrap" AcceptsReturn="True"
                        VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                        Height="160" Margin="0,10,0,0" Visibility="Collapsed"/>
+              <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Button x:Name="btnInstallCancel" Content="取消安装并清理" Style="{StaticResource DangerButton}" Width="130" Height="32"/>
+              </StackPanel>
             </StackPanel>
 
             <!-- ═══ 日志页 ═══ -->
@@ -613,6 +616,7 @@ $btnInstallWeb   = $window.FindName('btnInstallWeb')
 $btnOpenSite     = $window.FindName('btnOpenSite')
 $installStatus   = $window.FindName('installStatus')
 $txtInstallLog   = $window.FindName('txtInstallLog')
+$btnInstallCancel = $window.FindName('btnInstallCancel')
 $infoStatus  = $window.FindName('infoStatus')
 $infoPort    = $window.FindName('infoPort')
 $infoDir     = $window.FindName('infoDir')
@@ -889,6 +893,7 @@ function Update-InstallCard {
             $installCardTag.Parent.Background = $window.Resources['ColorTagOkBg']
             $btnInstallFull.IsEnabled = $false
             $btnInstallFull.Content = '已安装 ✓'
+            $btnInstallCancel.IsEnabled = $false
         } else {
             $installCardIcon.Text = '○'
             $installCardIcon.Foreground = $window.Resources['ColorTagWarnFg']
@@ -898,6 +903,7 @@ function Update-InstallCard {
             $installCardTag.Parent.Background = $window.Resources['ColorTagWarnBg']
             $btnInstallFull.IsEnabled = $true
             $btnInstallFull.Content = '一键安装完整版'
+            $btnInstallCancel.IsEnabled = $false
         }
     } catch {}
 }
@@ -1208,6 +1214,9 @@ $btnInstallFull.Add_Click({
 
 # 控制台版安装状态机（与独立向导同一套逻辑，只差界面）
 function Start-ConsoleInstall {
+    # 记录"安装开始前目录是否存在"——不存在 = 本次创建的，取消时可安全删除
+    $script:ConsoleDirExistedBefore = Test-Path $script:InstallDshDir
+    $btnInstallCancel.IsEnabled = $true
     $clone = Install-DshClone -DshDir $script:InstallDshDir
     if (-not $clone.ok) {
         $installStatus.Text = '❌ ' + $clone.error
@@ -1260,6 +1269,7 @@ function Finish-ConsoleInstall {
     $script:InstallPhase = 'done'
     $installStatus.Text = '✅ 安装完成！正在启动 DSH…'
     $btnInstallFull.IsEnabled = $true
+    $btnInstallCancel.IsEnabled = $false
     $installTimer.Stop()
     Update-StatusDisplay
     $script:PendingStartAfterInstall = $true
@@ -1308,6 +1318,43 @@ $installTimer.Add_Tick({
             $installTimer.Stop()
         }
     }
+})
+
+# 「取消安装并清理」：杀进程树 + 删除本次残留 + 复位状态
+# （只删"本次安装创建"的目录；安装前就存在的目录绝不删除）
+$btnInstallCancel.Add_Click({
+    # 1) 杀整个进程树（cmd → git/pnpm 的子进程一起结束）
+    if ($script:InstallProc) {
+        try { taskkill /PID $script:InstallProc.Id /T /F 2>$null | Out-Null } catch {}
+        $script:InstallProc = $null
+    }
+    $installTimer.Stop()
+    $script:InstallPhase = 'idle'
+    $script:PendingWebOpen = $false
+
+    # 2) 询问是否删除残留（只删本次安装创建的目录）
+    $dirInfo = $script:InstallDshDir
+    $canDelete = (-not $script:ConsoleDirExistedBefore) -and (Test-Path $dirInfo)
+    $msg = '要取消安装吗？'
+    if ($canDelete) {
+        $msg += "`n`n本次安装创建了文件夹：`n" + $dirInfo + "`n`n是否删除它（包括已下载的文件）？"
+    } elseif ($script:ConsoleDirExistedBefore) {
+        $msg += "`n`n（这个文件夹在安装前就存在，为了安全不会删除它）"
+    }
+    $ans = [System.Windows.MessageBox]::Show($msg, '取消安装', 'YesNo', 'Question')
+    if ($ans -ne 'Yes') { return }
+    if ($canDelete) {
+        try { Remove-Item $dirInfo -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+    }
+
+    # 3) 复位状态
+    $installStatus.Text = '已取消安装并清理'
+    $installStatus.Foreground = $window.Resources['ColorWarnFg']
+    $btnInstallFull.IsEnabled = $true
+    $btnInstallCancel.IsEnabled = $false
+    $txtInstallLog.Text = ''
+    Update-InstallCard
+    $lblStatus.Text = '已取消安装'
 })
 
 # ---------- 日志页按钮 ----------

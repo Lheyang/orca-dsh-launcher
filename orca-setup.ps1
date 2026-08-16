@@ -379,7 +379,8 @@ Add-Type -AssemblyName System.Windows.Forms   # FolderBrowserDialog 用
                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                      Height="300" Margin="0,14,0,0"/>
             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-              <Button x:Name="btnCancelInstall" Content="取消安装" Style="{StaticResource SecondaryButton}" Width="110" Height="34"/>
+              <Button x:Name="btnInstallBack" Content="‹ 上一步" Style="{StaticResource SecondaryButton}" Width="100" Height="34"/>
+              <Button x:Name="btnCancelInstall" Content="取消安装" Style="{StaticResource SecondaryButton}" Width="110" Height="34" Margin="10,0,0,0"/>
               <Button x:Name="btnInstallNext" Content="下一步 ›" Style="{StaticResource PrimaryButton}" Width="130" Height="34" Margin="10,0,0,0" IsEnabled="False"/>
             </StackPanel>
           </StackPanel>
@@ -436,6 +437,7 @@ $btnBrowse = $window.FindName('btnBrowse'); $btnDirBack = $window.FindName('btnD
 $installTitle = $window.FindName('installTitle'); $installStatus = $window.FindName('installStatus')
 $txtLog = $window.FindName('txtLog')
 $btnCancelInstall = $window.FindName('btnCancelInstall'); $btnInstallNext = $window.FindName('btnInstallNext')
+$btnInstallBack = $window.FindName('btnInstallBack')
 $doneSummary = $window.FindName('doneSummary'); $doneDetail = $window.FindName('doneDetail')
 $btnLaunch = $window.FindName('btnLaunch'); $btnDoneClose = $window.FindName('btnDoneClose')
 $lblStatus = $window.FindName('lblStatus')
@@ -638,12 +640,16 @@ function Start-Install {
     $script:Phase = 'idle'
     $installTitle.Text = '开始安装'
     $installStatus.Text = '准备中…'
+    $installStatus.Foreground = $window.Resources['ColorAccent']
     $btnCancelInstall.IsEnabled = $true
+    $btnInstallBack.IsEnabled = $true
     $btnInstallNext.IsEnabled = $false
     # 清空旧日志
     try { Remove-Item $script:InstallLogFile -Force -ErrorAction SilentlyContinue } catch {}
 
     $dshDir = $script:DshDir
+    # 记录"安装开始前这个目录是否存在"——不存在 = 本次安装创建的，取消时可安全删除
+    $script:DirExistedBefore = Test-Path $dshDir
 
     # 0) 准备目录
     $parent = Split-Path -Parent $dshDir
@@ -721,6 +727,7 @@ function Finish-Install {
     $installStatus.Text = '✅ 安装完成！'
     $installStatus.Foreground = $window.Resources['ColorOkFg']
     $btnCancelInstall.IsEnabled = $false
+    $btnInstallBack.IsEnabled = $false
     $btnInstallNext.IsEnabled = $true
     $tickTimer.Stop()
     # 显示完成页内容
@@ -786,15 +793,55 @@ $tickTimer.Add_Tick({
 
 $btnCancelInstall.Add_Click({
     if ($script:Proc) {
-        try { Stop-Process -Id $script:Proc.Id -Force -ErrorAction SilentlyContinue } catch {}
+        # 杀整个进程树（cmd → git/pnpm 的子进程也要一起结束）
+        try { taskkill /PID $script:Proc.Id /T /F 2>$null | Out-Null } catch {}
         $script:Proc = $null
     }
     $script:Phase = 'idle'
-    $installStatus.Text = '已取消安装'
+    $installStatus.Text = '已取消安装（可点「‹ 上一步」删除残留并重新选择位置）'
     $installStatus.Foreground = $window.Resources['ColorWarnFg']
     $btnCancelInstall.IsEnabled = $false
     $btnInstallNext.IsEnabled = $true
     $tickTimer.Stop()
+})
+
+# 「‹ 上一步」：取消安装 + 删除本次残留 + 回到选择位置页
+# （只删"本次安装创建"的目录；安装前就存在的目录绝不删除）
+$btnInstallBack.Add_Click({
+    # 1) 安装进行中 → 先取消（杀整个进程树）
+    if ($script:Proc) {
+        try { taskkill /PID $script:Proc.Id /T /F 2>$null | Out-Null } catch {}
+        $script:Proc = $null
+    }
+    $tickTimer.Stop()
+
+    # 2) 询问是否删除残留（只删本次安装创建的目录）
+    $dirInfo = $script:DshDir
+    $canDelete = (-not $script:DirExistedBefore) -and (Test-Path $dirInfo)
+    $msg = '要回到上一步吗？'
+    if ($canDelete) {
+        $msg += "`n`n本次安装创建了文件夹：`n" + $dirInfo + "`n`n是否删除它（包括已下载的文件）？"
+    } elseif ($script:DirExistedBefore) {
+        $msg += "`n`n（这个文件夹在安装前就存在，为了安全不会删除它）"
+    }
+    $ans = [System.Windows.MessageBox]::Show($msg, '上一步', 'YesNo', 'Question')
+    if ($ans -ne 'Yes') { return }
+    if ($canDelete) {
+        try {
+            Remove-Item $dirInfo -Recurse -Force -ErrorAction SilentlyContinue
+            Write-SetupLog ('[安装] 已删除残留目录：' + $dirInfo)
+        } catch {}
+    }
+
+    # 3) 回到选择位置页，复位状态
+    $script:Phase = 'idle'
+    $script:DshDir = ''
+    Show-SetupPage 'dir'
+    $installStatus.Text = ''
+    $installStatus.Foreground = $window.Resources['ColorAccent']
+    $btnCancelInstall.IsEnabled = $true
+    $btnInstallNext.IsEnabled = $false
+    Set-Status '已取消安装，可重新选择位置'
 })
 
 $btnInstallNext.Add_Click({
