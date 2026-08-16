@@ -279,6 +279,33 @@ $script:pendingStart = $false    # 正在启动服务器
       <Setter Property="Background" Value="{DynamicResource ColorTagNeutralBg}"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
+    <!-- 强调色色块选择器（设置页外观组） -->
+    <Style x:Key="AccentSwatch" TargetType="RadioButton">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="ring" Width="28" Height="28" CornerRadius="14"
+                    BorderThickness="2" BorderBrush="Transparent" Background="Transparent">
+              <Border x:Name="sw" Width="21" Height="21" CornerRadius="10.5"
+                      Background="{TemplateBinding Foreground}">
+                <TextBlock x:Name="ck" Text="✓" FontSize="11" FontWeight="Bold" Foreground="#0E1218"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+              </Border>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ring" Property="BorderBrush" Value="#5A5F6E"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="ring" Property="BorderBrush" Value="#F0F0F0"/>
+                <Setter TargetName="ck" Property="Visibility" Value="Visible"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
   </Window.Resources>
 
   <!-- 外层圆角主容器 -->
@@ -512,53 +539,71 @@ $script:pendingStart = $false    # 正在启动服务器
               <TextBlock Text="设置" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
               <TextBlock Text="修改后点保存，立即生效" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
 
-              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,16" Margin="0,16,0,0">
+              <!-- 基本设置 -->
+              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,16,0,0">
                 <StackPanel>
+                  <TextBlock Text="基本设置" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" Margin="0,0,0,12"/>
                   <Grid>
                     <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="110"/>
+                      <ColumnDefinition Width="90"/>
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                       <RowDefinition Height="Auto"/>
                       <RowDefinition Height="14"/>
                       <RowDefinition Height="Auto"/>
-                      <RowDefinition Height="16"/>
-                      <RowDefinition Height="Auto"/>
-                      <RowDefinition Height="8"/>
-                      <RowDefinition Height="Auto"/>
-                      <RowDefinition Height="14"/>
-                      <RowDefinition Height="Auto"/>
-                      <RowDefinition Height="12"/>
-                      <RowDefinition Height="Auto"/>
-                      <RowDefinition Height="12"/>
-                      <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock Text="端口" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtPort" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="30" HorizontalAlignment="Left" Width="120"/>
                     <TextBlock Text="DSH 目录" Grid.Row="2" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtDshDir" Grid.Row="2" Grid.Column="1" Style="{StaticResource ModernTextBox}" Height="30"/>
-                    <CheckBox x:Name="chkStartup" Grid.Row="4" Grid.Column="1" Content="开机自启托盘（Windows 登录时）" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12"/>
-                    <CheckBox x:Name="chkTrayAuto" Grid.Row="6" Grid.Column="1" Content="DSH 启动时自动拉起托盘" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12"/>
-                    <CheckBox x:Name="chkDshAutoStart" Grid.Row="8" Grid.Column="1" Content="开机自启 DSH 服务器（Windows 登录时）" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12"/>
-                    <TextBlock Text="主题" Grid.Row="10" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" VerticalAlignment="Center"/>
-                    <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal">
+                  </Grid>
+                </StackPanel>
+              </Border>
+
+              <!-- 开机自启 -->
+              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,10,0,0">
+                <StackPanel>
+                  <TextBlock Text="开机自启" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" Margin="0,0,0,10"/>
+                  <CheckBox x:Name="chkStartup" Content="开机自启托盘（Windows 登录时）" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" Margin="0,3,0,3"/>
+                  <CheckBox x:Name="chkTrayAuto" Content="DSH 启动时自动拉起托盘" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" Margin="0,3,0,3"/>
+                  <CheckBox x:Name="chkDshAutoStart" Content="开机自启 DSH 服务器（Windows 登录时）" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" Margin="0,3,0,3"/>
+                </StackPanel>
+              </Border>
+
+              <!-- 外观 -->
+              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,10,0,0">
+                <StackPanel>
+                  <TextBlock Text="外观" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" Margin="0,0,0,12"/>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="90"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="16"/>
+                      <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="主题" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
                       <RadioButton x:Name="rdoDark" Content="深色" GroupName="theme" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" IsChecked="True"/>
                       <RadioButton x:Name="rdoLight" Content="浅色" GroupName="theme" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" Margin="20,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="强调色" Grid.Row="12" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" VerticalAlignment="Center"/>
-                    <WrapPanel Grid.Row="12" Grid.Column="1" Orientation="Horizontal">
-                      <RadioButton x:Name="rdoAccentGreen"  Content="● 经典青绿" GroupName="accent" Foreground="#3ED6A3" FontSize="12"/>
-                      <RadioButton x:Name="rdoAccentBlue"   Content="● 科技蓝"   GroupName="accent" Foreground="#5B9BFF" FontSize="12" Margin="14,0,0,0"/>
-                      <RadioButton x:Name="rdoAccentPurple" Content="● 蓝紫渐变" GroupName="accent" Foreground="#8B7CF6" FontSize="12" Margin="14,0,0,0"/>
-                      <RadioButton x:Name="rdoAccentAmber"  Content="● 琥珀暖橙" GroupName="accent" Foreground="#F2B14B" FontSize="12" Margin="14,0,0,0"/>
-                      <RadioButton x:Name="rdoAccentRose"   Content="● 玫红"     GroupName="accent" Foreground="#F27DA8" FontSize="12" Margin="14,0,0,0"/>
-                      <RadioButton x:Name="rdoAccentSlate"  Content="● 银灰蓝"   GroupName="accent" Foreground="#9AA7BC" FontSize="12" Margin="14,0,0,0"/>
-                    </WrapPanel>
+                    <TextBlock Text="强调色" Grid.Row="2" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                      <RadioButton x:Name="rdoAccentGreen"  GroupName="accent" Style="{StaticResource AccentSwatch}" Foreground="#3ED6A3" ToolTip="经典青绿"/>
+                      <RadioButton x:Name="rdoAccentBlue"   GroupName="accent" Style="{StaticResource AccentSwatch}" Foreground="#5B9BFF" ToolTip="科技蓝" Margin="10,0,0,0"/>
+                      <RadioButton x:Name="rdoAccentPurple" GroupName="accent" Style="{StaticResource AccentSwatch}" Foreground="#8B7CF6" ToolTip="蓝紫渐变" Margin="10,0,0,0"/>
+                      <RadioButton x:Name="rdoAccentAmber"  GroupName="accent" Style="{StaticResource AccentSwatch}" Foreground="#F2B14B" ToolTip="琥珀暖橙" Margin="10,0,0,0"/>
+                      <RadioButton x:Name="rdoAccentRose"   GroupName="accent" Style="{StaticResource AccentSwatch}" Foreground="#F27DA8" ToolTip="玫红" Margin="10,0,0,0"/>
+                      <RadioButton x:Name="rdoAccentSlate"  GroupName="accent" Style="{StaticResource AccentSwatch}" Foreground="#9AA7BC" ToolTip="银灰蓝" Margin="10,0,0,0"/>
+                    </StackPanel>
                   </Grid>
-                  <Button x:Name="btnSave" Content="保存设置" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" Width="120" Height="34" Margin="0,18,0,0"/>
                 </StackPanel>
               </Border>
+
+              <Button x:Name="btnSave" Content="保存设置" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" Width="120" Height="34" Margin="0,16,0,0"/>
             </StackPanel>
 
             <!-- ═══ 关于页 ═══ -->
