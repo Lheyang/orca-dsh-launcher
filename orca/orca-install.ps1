@@ -378,3 +378,110 @@ function New-DesktopShortcut {
         return $true
     } catch { return $false }
 }
+
+# ============================================================
+#  六、自定义对话框（深色圆角风格，替代系统 MessageBox）
+# ============================================================
+#  用法：
+#    Show-OrcaDialog -Title '上一步' -Message '要回到上一步吗？...' -Type question -Buttons YesNo -Owner $window
+#    → YesNo 返回 $true(是)/$false(否)；OK 返回 $true(好的)
+#  需要 WPF 程序集已加载（调用方在主窗口加载之后调用）。
+
+function Show-OrcaDialog {
+    param(
+        [string]$Title = 'Orca',
+        [string]$Message = '',
+        [ValidateSet('question','info','warning','error')][string]$Type = 'info',
+        [ValidateSet('YesNo','OK')][string]$Buttons = 'OK',
+        $Owner = $null
+    )
+    $iconMap = @{ question = '❓'; info = '🐋'; warning = '⚠️'; error = '❌' }
+    $icon = $iconMap[$Type]
+    # 消息可能含路径等特殊字符，转义 XML 防 XAML 解析失败
+    $msgSafe = [System.Security.SecurityElement]::Escape($Message)
+    $titleSafe = [System.Security.SecurityElement]::Escape($Title)
+
+    [xml]$xaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="$titleSafe" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False" FontFamily="Microsoft YaHei UI" Topmost="True">
+  <Window.Resources>
+    <Style x:Key="DLGBtn" TargetType="Button">
+      <Setter Property="Background" Value="#2D2D2D"/>
+      <Setter Property="Foreground" Value="#E0E0E0"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Padding" Value="20,7"/>
+      <Setter Property="Margin" Value="0,0,0,0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="#3A3A3A"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="DLGBtnPrimary" TargetType="Button" BasedOn="{StaticResource DLGBtn}">
+      <Setter Property="Background" Value="#F0F0F0"/>
+      <Setter Property="Foreground" Value="#101010"/>
+    </Style>
+  </Window.Resources>
+  <Border CornerRadius="12" Background="#1E1E1E" BorderThickness="1" BorderBrush="#2A2A2A" Padding="20,18">
+    <StackPanel>
+      <StackPanel Orientation="Horizontal">
+        <TextBlock x:Name="dlgIco" Text="$icon" FontSize="20" VerticalAlignment="Center"/>
+        <TextBlock x:Name="dlgTitle" Text="$titleSafe" FontSize="15" FontWeight="Bold" Foreground="#F0F0F0" Margin="10,0,0,0" VerticalAlignment="Center"/>
+      </StackPanel>
+      <TextBlock x:Name="dlgMsg" Text="$msgSafe" FontSize="13" Foreground="#C8C8D0" TextWrapping="Wrap" MaxWidth="430"
+                 Margin="0,14,0,0" LineHeight="21"/>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+        <Button x:Name="btnNo" Content="否" Style="{StaticResource DLGBtn}"/>
+        <Button x:Name="btnYes" Content="是" Style="{StaticResource DLGBtnPrimary}" Margin="10,0,0,0"/>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>
+"@
+
+    $script:dialogResult = $false
+    try {
+        $reader = New-Object System.Xml.XmlNodeReader($xaml)
+        $dlg = [System.Windows.Markup.XamlReader]::Load($reader)
+        $btnYes = $dlg.FindName('btnYes')
+        $btnNo  = $dlg.FindName('btnNo')
+
+        if ($Buttons -eq 'OK') {
+            $btnNo.Visibility = 'Collapsed'
+            $btnYes.Content = '好的'
+            $btnYes.IsDefault = $true
+            $dlg.Add_KeyDown({ if ($_.Key -eq 'Escape') { $script:dialogResult = $false; $dlg.Close() } })
+        } else {
+            $btnYes.Content = '是'
+            $btnNo.Content = '否'
+            $btnYes.IsDefault = $true   # 回车=是
+            $btnNo.IsCancel = $true     # Esc=否
+        }
+        $btnYes.Add_Click({ $script:dialogResult = $true; $dlg.Close() })
+        $btnNo.Add_Click({ $script:dialogResult = $false; $dlg.Close() })
+
+        # 注意：PowerShell 里 $dlg.ShowDialog($Owner) 会找不到带参重载，
+        # 必须先设置 Owner 属性，再调用无参 ShowDialog()
+        if ($Owner) {
+            try { $dlg.Owner = $Owner } catch {}
+        }
+        $null = $dlg.ShowDialog()
+    } catch {
+        Write-SetupLog ('[对话框] 弹出自定义对话框失败：' + $_.Exception.Message)
+    }
+    return $script:dialogResult
+}

@@ -482,7 +482,7 @@ $btnMin.Add_Click({ $window.WindowState = 'Minimized' })
 $btnClose.Add_Click({
     # 安装过程中不允许直接关（会打断安装）
     if ($script:Phase -in @('cloning','installing','finishing')) {
-        [System.Windows.MessageBox]::Show('正在安装中，请先点击「取消安装」。', 'Orca DSH Launcher', 'OK', 'Information') | Out-Null
+        $null = Show-OrcaDialog -Title 'Orca DSH Launcher' -Message '正在安装中，请先点击「取消安装」。' -Type info -Buttons OK -Owner $window
     } else {
         $window.Close()
     }
@@ -542,7 +542,7 @@ function Start-EnvCheck {
 $btnEnvRetry.Add_Click({ Start-EnvCheck })
 $btnEnvNext.Add_Click({
     if (-not $script:envOk) {
-        [System.Windows.MessageBox]::Show('还有东西没装好，先装好再继续哦。', 'Orca DSH Launcher', 'OK', 'Warning') | Out-Null
+        $null = Show-OrcaDialog -Title 'Orca DSH Launcher' -Message '还有东西没装好，先装好再继续哦。' -Type warning -Buttons OK -Owner $window
         return
     }
     Show-SetupPage 'net'
@@ -610,13 +610,13 @@ $btnBrowse.Add_Click({
 $btnDirBack.Add_Click({ Show-SetupPage 'net' })
 $btnDirNext.Add_Click({
     if (-not $script:DshDir) {
-        [System.Windows.MessageBox]::Show('请先选择一个安装位置。', 'Orca DSH Launcher', 'OK', 'Warning') | Out-Null
+        $null = Show-OrcaDialog -Title 'Orca DSH Launcher' -Message '请先选择一个安装位置。' -Type warning -Buttons OK -Owner $window
         return
     }
     # 插件包来源检查
     $script:pluginSource = Get-PluginSource -FallbackDir $script:SetupScriptDir
     if (-not $script:pluginSource) {
-        [System.Windows.MessageBox]::Show('找不到插件文件包，请重新下载本程序后再试。', 'Orca DSH Launcher', 'OK', 'Error') | Out-Null
+        $null = Show-OrcaDialog -Title 'Orca DSH Launcher' -Message '找不到插件文件包，请重新下载本程序后再试。' -Type error -Buttons OK -Owner $window
         return
     }
     Show-SetupPage 'install'
@@ -824,8 +824,8 @@ $btnInstallBack.Add_Click({
     } elseif ($script:DirExistedBefore) {
         $msg += "`n`n（这个文件夹在安装前就存在，为了安全不会删除它）"
     }
-    $ans = [System.Windows.MessageBox]::Show($msg, '上一步', 'YesNo', 'Question')
-    if ($ans -ne 'Yes') { return }
+    $ans = Show-OrcaDialog -Title '上一步' -Message $msg -Type question -Buttons YesNo -Owner $window
+    if (-not $ans) { return }
     if ($canDelete) {
         try {
             Remove-Item $dirInfo -Recurse -Force -ErrorAction SilentlyContinue
@@ -862,7 +862,7 @@ $btnLaunch.Add_Click({
         Set-Status 'DSH 已启动，浏览器已打开'
     } else {
         Set-Status '启动超时，请稍后手动打开：http://127.0.0.1:3080'
-        [System.Windows.MessageBox]::Show('DSH 启动较慢，稍后手动在浏览器打开：http://127.0.0.1:3080' + "`n" + '（或双击桌面「Orca DSH Launcher」打开管理窗口）', 'Orca DSH Launcher', 'OK', 'Information') | Out-Null
+        $null = Show-OrcaDialog -Title 'Orca DSH Launcher' -Message ('DSH 启动较慢，稍后手动在浏览器打开：http://127.0.0.1:3080' + "`n" + '（或双击桌面「Orca DSH Launcher」打开管理窗口）') -Type info -Buttons OK -Owner $window
         $btnLaunch.IsEnabled = $true
     }
 })

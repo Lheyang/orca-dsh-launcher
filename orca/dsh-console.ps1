@@ -57,9 +57,11 @@ if ($args -contains '-QuickCheck') {
 }
 
 # 防止重复实例（控制台只开一个）
+# 先加载 WPF（自定义对话框需要），不加载主窗口
+Add-Type -AssemblyName PresentationFramework
 $mutex = New-Object System.Threading.Mutex($false, 'Local\DSH-Console-Single')
 if (-not $mutex.WaitOne(0, $false)) {
-    [System.Windows.MessageBox]::Show('控制台已经打开了，先看看托盘或任务栏。', 'Orca DSH Launcher')
+    $null = Show-OrcaDialog -Title 'Orca DSH Launcher' -Message '控制台已经打开了，先看看托盘或任务栏。' -Type info -Buttons OK
     exit
 }
 
@@ -982,10 +984,8 @@ $btnCheckOverview.Add_Click({
 # 一键更新 DSH（git pull，需用户确认；失败不影响现有版本）
 $btnUpdateDsh.Add_Click({
     try {
-        $confirm = [System.Windows.MessageBox]::Show(
-            '即将更新 DSH 本体（在 ' + $script:orcaCfgDshDir + ' 执行 git pull）。' + "`n" + '更新后需要重启 DSH 才能生效。' + "`n" + '继续吗？',
-            '更新 DSH', 'YesNo', 'Question')
-        if ($confirm -ne 'Yes') { return }
+        $confirm = Show-OrcaDialog -Title '更新 DSH' -Message ('即将更新 DSH 本体（在 ' + $script:orcaCfgDshDir + ' 执行 git pull）。' + "`n" + '更新后需要重启 DSH 才能生效。' + "`n" + '继续吗？') -Type question -Buttons YesNo -Owner $window
+        if (-not $confirm) { return }
         $btnUpdateDsh.IsEnabled = $false
         $lblStatus.Text = '正在更新 DSH…（git pull，可能需要一点时间）'
         [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background)
@@ -996,10 +996,10 @@ $btnUpdateDsh.Add_Click({
             $script:lastDetails = $null
             Update-StatusDisplay
             $lblStatus.Text = '更新完成！请重启 DSH 生效（本窗口可点「重启服务器」）'
-            [System.Windows.MessageBox]::Show('DSH 更新成功！' + "`n" + $result.output + "`n" + '请重启 DSH 生效。', '更新完成', 'OK', 'Information')
+            $null = Show-OrcaDialog -Title '更新完成' -Message ('DSH 更新成功！' + "`n" + $result.output + "`n" + '请重启 DSH 生效。') -Type info -Buttons OK -Owner $window
         } else {
             $lblStatus.Text = '更新失败：git pull 出错（当前版本不受影响）'
-            [System.Windows.MessageBox]::Show('更新失败，当前版本不受影响。' + "`n" + $result.output, '更新失败', 'OK', 'Warning')
+            $null = Show-OrcaDialog -Title '更新失败' -Message ('更新失败，当前版本不受影响。' + "`n" + $result.output) -Type warning -Buttons OK -Owner $window
         }
         $btnUpdateDsh.IsEnabled = $true
     } catch {
@@ -1172,7 +1172,7 @@ $btnInstallWeb.Add_Click({
 $btnInstallFull.Add_Click({
     try {
         if ($script:InstallPhase -in @('cloning','installing','building','finishing')) {
-            [System.Windows.MessageBox]::Show('安装正在进行中，请稍候。', 'Orca DSH Launcher', 'OK', 'Information') | Out-Null
+            $null = Show-OrcaDialog -Title 'Orca DSH Launcher' -Message '安装正在进行中，请稍候。' -Type info -Buttons OK -Owner $window
             return
         }
         # 1) 环境检测
@@ -1180,7 +1180,7 @@ $btnInstallFull.Add_Click({
         $envResult = Test-NodeEnv
         if (-not $envResult.ok) {
             $msg = '还缺少以下软件：' + "`n" + ($envResult.missing -join "`n") + "`n`n" + '装好后再来点「一键安装完整版」。'
-            [System.Windows.MessageBox]::Show($msg, '缺少环境', 'OK', 'Warning') | Out-Null
+            $null = Show-OrcaDialog -Title '缺少环境' -Message $msg -Type warning -Buttons OK -Owner $window
             $installStatus.Text = '缺少环境，请先安装所需软件'
             return
         }
@@ -1190,8 +1190,8 @@ $btnInstallFull.Add_Click({
         $netResult = Test-GithubNetwork
         if (-not $netResult.githubOk) {
             $msg = '当前网络无法访问 GitHub，下载可能会失败。' + "`n" + '检查结果：' + $netResult.detail + "`n`n" + '建议：检查代理/VPN 设置，或更换网络后再试。' + "`n" + '如果确认网络没问题，可以点「是」继续尝试。'
-            $ans = [System.Windows.MessageBox]::Show($msg, '网络不可用', 'YesNo', 'Warning')
-            if ($ans -ne 'Yes') { $installStatus.Text = '已取消安装'; return }
+            $ans = Show-OrcaDialog -Title '网络不可用' -Message $msg -Type warning -Buttons YesNo -Owner $window
+            if (-not $ans) { $installStatus.Text = '已取消安装'; return }
         }
         # 3) 选择安装位置
         $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -1341,8 +1341,8 @@ $btnInstallCancel.Add_Click({
     } elseif ($script:ConsoleDirExistedBefore) {
         $msg += "`n`n（这个文件夹在安装前就存在，为了安全不会删除它）"
     }
-    $ans = [System.Windows.MessageBox]::Show($msg, '取消安装', 'YesNo', 'Question')
-    if ($ans -ne 'Yes') { return }
+    $ans = Show-OrcaDialog -Title '取消安装' -Message $msg -Type question -Buttons YesNo -Owner $window
+    if (-not $ans) { return }
     if ($canDelete) {
         try { Remove-Item $dirInfo -Recurse -Force -ErrorAction SilentlyContinue } catch {}
     }
