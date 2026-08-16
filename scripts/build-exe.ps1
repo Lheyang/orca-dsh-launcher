@@ -69,6 +69,20 @@ if ($content -notmatch [regex]::Escape($marker)) {
 $content = $content.Replace($marker, $libContent)
 Write-Host "[3/5] 安装逻辑库已内联（EXE 自包含）"
 
+# 3.2 注入虎鲸 logo（dsh-tray.ico → Base64，标题栏/对话框用，EXE 完全自包含）
+$logoFile = Join-Path $proj 'orca\dsh-tray.ico'
+if (-not (Test-Path $logoFile)) {
+    Write-Host "[错误] 找不到虎鲸图标：$logoFile"
+    exit 1
+}
+if ($content -notmatch '__ORCA_LOGO_B64__') {
+    Write-Host "[错误] orca-setup.ps1 里找不到占位符 __ORCA_LOGO_B64__，无法注入"
+    exit 1
+}
+$logoB64 = [System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes($logoFile))
+$content = $content.Replace('__ORCA_LOGO_B64__', $logoB64)
+Write-Host "[3/5] 虎鲸 logo 已内嵌（Base64 长度：$($logoB64.Length)）"
+
 $packed = $content.Replace('__PLUGIN_PAYLOAD_B64__', $b64)
 $packedFile = Join-Path $env:TEMP 'orca-setup-packed.ps1'
 # 注意：必须带 BOM 写（PowerShell 5.1 解析中文用）

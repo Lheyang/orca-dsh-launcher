@@ -30,6 +30,10 @@ $ErrorActionPreference = 'Stop'
 # 程序会改从脚本所在目录读取插件文件（开发模式）。
 $script:SetupPayloadB64 = '__PLUGIN_PAYLOAD_B64__'
 
+# 虎鲸 logo（dsh-tray.ico）的 Base64，由 build-exe.ps1 打包时注入；
+# 直接运行本 ps1 时保持占位符，改从脚本目录读取 ico 文件（开发模式）。
+$script:OrcaLogoB64 = '__ORCA_LOGO_B64__'
+
 # 加载安装核心逻辑库（环境/网络检测、clone、install+build、npx web、装插件）
 . (Join-Path $PSScriptRoot 'orca\orca-install.ps1')
 
@@ -225,7 +229,7 @@ Add-Type -AssemblyName System.Windows.Forms   # FolderBrowserDialog 用
       <!-- 顶部标题栏（可拖动） -->
       <Grid x:Name="titleBar" Grid.Row="0" Background="Transparent">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-          <TextBlock Text="🐋" FontSize="18" VerticalAlignment="Center"/>
+          <Image x:Name="imgLogo" Width="20" Height="20" VerticalAlignment="Center" Stretch="Uniform"/>
           <TextBlock Text="Orca DSH Launcher 一键安装" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}" Margin="8,0,0,0" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
@@ -414,6 +418,7 @@ $window = [System.Windows.Markup.XamlReader]::Load($reader)
 
 # 取控件
 $titleBar      = $window.FindName('titleBar')
+$imgLogo       = $window.FindName('imgLogo')
 $btnMin        = $window.FindName('btnMin')
 $btnClose      = $window.FindName('btnClose')
 $step1 = $window.FindName('step1'); $step2 = $window.FindName('step2')
@@ -441,6 +446,31 @@ $btnInstallBack = $window.FindName('btnInstallBack')
 $doneSummary = $window.FindName('doneSummary'); $doneDetail = $window.FindName('doneDetail')
 $btnLaunch = $window.FindName('btnLaunch'); $btnDoneClose = $window.FindName('btnDoneClose')
 $lblStatus = $window.FindName('lblStatus')
+
+# ---------- 标题栏虎鲸 logo ----------
+# 优先用内嵌 Base64（EXE 打包版，完全自包含）；开发模式读 ico 文件
+try {
+    $logoStream = $null
+    $logoB64 = $script:OrcaLogoB64
+    if ($logoB64 -and $logoB64 -notmatch '^__' -and $logoB64.Length -gt 100) {
+        $logoBytes = [System.Convert]::FromBase64String($logoB64)
+        $logoStream = New-Object System.IO.MemoryStream(, $logoBytes)
+    } else {
+        $icoPath = Join-Path $script:SetupScriptDir 'orca\dsh-tray.ico'
+        if (Test-Path $icoPath) { $logoStream = [System.IO.File]::OpenRead($icoPath) }
+    }
+    if ($logoStream) {
+        try {
+            $decoder = New-Object System.Windows.Media.Imaging.IconBitmapDecoder(
+                $logoStream,
+                [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat,
+                [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
+            $frame = $decoder.Frames | Where-Object { $_.PixelWidth -le 48 } | Sort-Object PixelWidth -Descending | Select-Object -First 1
+            if (-not $frame) { $frame = $decoder.Frames | Sort-Object PixelWidth -Descending | Select-Object -First 1 }
+            if ($frame) { $frame.Freeze(); $imgLogo.Source = $frame }
+        } finally { $logoStream.Dispose() }
+    }
+} catch {}
 
 # ---------- 全局状态 ----------
 $script:netResult = $null        # 网络检测结果

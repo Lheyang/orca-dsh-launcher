@@ -387,6 +387,35 @@ function New-DesktopShortcut {
 #    → YesNo 返回 $true(是)/$false(否)；OK 返回 $true(好的)
 #  需要 WPF 程序集已加载（调用方在主窗口加载之后调用）。
 
+# 取虎鲸 logo 图像（供对话框品牌行用）
+# EXE 打包版：用内嵌 Base64（$script:OrcaLogoB64，由 build-exe 注入）；
+# 控制台/开发版：读脚本目录的 dsh-tray.ico
+function Get-OrcaLogoImage {
+    try {
+        $logoStream = $null
+        $logoB64 = $script:OrcaLogoB64
+        if ($logoB64 -and $logoB64 -notmatch '^__' -and $logoB64.Length -gt 100) {
+            $logoBytes = [System.Convert]::FromBase64String($logoB64)
+            $logoStream = New-Object System.IO.MemoryStream(, $logoBytes)
+        } else {
+            $icoPath = Join-Path $PSScriptRoot 'dsh-tray.ico'
+            if (Test-Path $icoPath) { $logoStream = [System.IO.File]::OpenRead($icoPath) }
+        }
+        if ($logoStream) {
+            try {
+                $decoder = New-Object System.Windows.Media.Imaging.IconBitmapDecoder(
+                    $logoStream,
+                    [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat,
+                    [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
+                $frame = $decoder.Frames | Where-Object { $_.PixelWidth -le 48 } | Sort-Object PixelWidth -Descending | Select-Object -First 1
+                if (-not $frame) { $frame = $decoder.Frames | Sort-Object PixelWidth -Descending | Select-Object -First 1 }
+                if ($frame) { $frame.Freeze(); return $frame }
+            } finally { $logoStream.Dispose() }
+        }
+    } catch {}
+    return $null
+}
+
 function Show-OrcaDialog {
     param(
         [string]$Title = 'Orca',
@@ -495,7 +524,7 @@ function Show-OrcaDialog {
         </Border>
         <!-- 品牌行 -->
         <DockPanel Margin="20,14,20,0">
-          <TextBlock Text="🐋" FontSize="12" VerticalAlignment="Center" Opacity="0.9"/>
+          <Image x:Name="dlgLogo" Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center"/>
           <TextBlock Text="Orca DSH Launcher" FontSize="10.5" Foreground="#7A7E8C" Margin="6,0,0,0" VerticalAlignment="Center"/>
         </DockPanel>
         <!-- 内容区 -->
@@ -531,6 +560,12 @@ function Show-OrcaDialog {
         $dlg = [System.Windows.Markup.XamlReader]::Load($reader)
         $btnYes = $dlg.FindName('btnYes')
         $btnNo  = $dlg.FindName('btnNo')
+        # 品牌行 logo
+        $dlgLogo = $dlg.FindName('dlgLogo')
+        if ($dlgLogo) {
+            $logoImg = Get-OrcaLogoImage
+            if ($logoImg) { $dlgLogo.Source = $logoImg }
+        }
 
         if ($Buttons -eq 'OK') {
             $btnNo.Visibility = 'Collapsed'
