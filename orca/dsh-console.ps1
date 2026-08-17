@@ -465,12 +465,12 @@ $script:pendingStart = $false    # 正在启动服务器
               </Border>
               </StackPanel>
 
-              <!-- 收纳态悬浮图标（可拖动自由摆放；图标图片先留空，占位符为 💰） -->
+              <!-- 收纳态悬浮图标（可拖动自由摆放；¥ 徽标随主题/强调色自适应，小圆点=当前时段） -->
               <Canvas>
-                <Border x:Name="priceMiniIcon" Canvas.Left="500" Canvas.Top="8" Width="32" Height="32" CornerRadius="6" Background="{DynamicResource ColorCard}" BorderBrush="{DynamicResource ColorBorder}" BorderThickness="1" Cursor="Hand" ToolTip="点击展开计费时段卡片">
+                <Border x:Name="priceMiniIcon" Canvas.Left="500" Canvas.Top="8" Width="32" Height="32" CornerRadius="8" Background="{DynamicResource ColorCard}" BorderBrush="{DynamicResource ColorBorder}" BorderThickness="1" Cursor="Hand" ToolTip="计费时段（点击展开卡片）">
                   <Grid>
-                    <Image x:Name="priceIconImg" Width="22" Height="22" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="priceIconFallback" Text="💰" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource ColorTextPrimary}"/>
+                    <TextBlock Text="¥" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Ellipse x:Name="priceMiniDot" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0" Fill="#9A9A9A"/>
                   </Grid>
                 </Border>
               </Canvas>
@@ -722,8 +722,7 @@ $priceCardSchedule = $window.FindName('priceCardSchedule')
 $priceCardPrice    = $window.FindName('priceCardPrice')
 $btnPriceCollapse  = $window.FindName('btnPriceCollapse')
 $priceMiniIcon     = $window.FindName('priceMiniIcon')
-$priceIconImg      = $window.FindName('priceIconImg')
-$priceIconFallback = $window.FindName('priceIconFallback')
+$priceMiniDot      = $window.FindName('priceMiniDot')
 $chkPeakReminder   = $window.FindName('chkPeakReminder')
 $installHelp     = $window.FindName('installHelp')
 $btnInstallFull  = $window.FindName('btnInstallFull')
@@ -1014,8 +1013,6 @@ function Update-StatusDisplay {
 }
 
 # ---------- 计费时段卡片（DeepSeek 峰谷定价） ----------
-# 收纳态图标图片：您提供图片后，把图片放到本目录（orca\），并把下面的文件名改好（如 'price-icon.png'）
-$script:PriceIconPath = ''
 $script:priceMiniDragging = $false
 $script:priceMiniDragStartX = 0
 $script:priceMiniDragStartY = 0
@@ -1040,6 +1037,14 @@ function Update-PriceDisplay {
         $priceCardCountdown.Text = $p.NextChangeText
         $priceCardSchedule.Text  = $p.TodayScheduleText
         $priceCardPrice.Text     = $p.PriceText
+        # 收纳图标：状态点颜色（红=高峰 / 绿=空闲）+ 悬浮提示
+        if ($p.Period -eq 'peak') {
+            $priceMiniDot.Fill = New-Brush '#F07878'
+            $priceMiniIcon.ToolTip = '🔴 高峰时段（价格更高）· 点击展开卡片'
+        } else {
+            $priceMiniDot.Fill = New-Brush '#36D199'
+            $priceMiniIcon.ToolTip = '🟢 空闲时段（半价）· 点击展开卡片'
+        }
     } catch {}
 }
 
@@ -1248,6 +1253,21 @@ $btnCheckOverview.Add_Click({
 })
 
 # 一键更新 DSH（git pull，需用户确认；失败不影响现有版本）
+# 更新结果太长时截断（git pull 输出可能几十上百行，全部塞进弹窗会把按钮顶出屏幕）
+function Format-UpdateResult([string]$Output, [string]$Prefix, [string]$Suffix) {
+    $lines = @($Output -split "`r?`n")
+    $maxShow = 60
+    $text = $Prefix
+    if ($lines.Count -gt $maxShow) {
+        $text += "`n…（输出共 $($lines.Count) 行，仅显示最后 $maxShow 行）`n"
+        $text += (($lines | Select-Object -Last $maxShow) -join "`n")
+    } elseif ($Output) {
+        $text += "`n" + $Output
+    }
+    if ($Suffix) { $text += "`n" + $Suffix }
+    return $text
+}
+
 $btnUpdateDsh.Add_Click({
     try {
         $confirm = Show-OrcaDialog -Title '更新 DSH' -Message ('即将更新 DSH 本体（在 ' + $script:orcaCfgDshDir + ' 执行 git pull）。' + "`n" + '更新后需要重启 DSH 才能生效。' + "`n" + '继续吗？') -Type question -Buttons YesNo -Owner $window
@@ -1262,10 +1282,12 @@ $btnUpdateDsh.Add_Click({
             $script:lastDetails = $null
             Update-StatusDisplay
             $lblStatus.Text = '更新完成！请重启 DSH 生效（本窗口可点「重启服务器」）'
-            $null = Show-OrcaDialog -Title '更新完成' -Message ('DSH 更新成功！' + "`n" + $result.output + "`n" + '请重启 DSH 生效。') -Type info -Buttons OK -Owner $window
+            $msg = Format-UpdateResult -Output $result.output -Prefix 'DSH 更新成功！' -Suffix '请重启 DSH 生效。'
+            $null = Show-OrcaDialog -Title '更新完成' -Message $msg -Type info -Buttons OK -Owner $window
         } else {
             $lblStatus.Text = '更新失败：git pull 出错（当前版本不受影响）'
-            $null = Show-OrcaDialog -Title '更新失败' -Message ('更新失败，当前版本不受影响。' + "`n" + $result.output) -Type warning -Buttons OK -Owner $window
+            $msg = Format-UpdateResult -Output $result.output -Prefix '更新失败，当前版本不受影响。' -Suffix ''
+            $null = Show-OrcaDialog -Title '更新失败' -Message $msg -Type warning -Buttons OK -Owner $window
         }
         $btnUpdateDsh.IsEnabled = $true
     } catch {
@@ -1793,20 +1815,8 @@ $window.Add_Loaded({
     $chkDshAutoStart.IsChecked = Test-DshAutoStart
     # 计费提醒开关（高峰开始前 15 分钟提醒）
     $chkPeakReminder.IsChecked = $script:orcaCfgPeakReminder
-    # 计费卡片初始状态：默认展开；收纳图标图片待用户提供（占位符 💰）
+    # 计费卡片初始状态：默认展开；收纳图标为 ¥ 徽标（颜色随主题/强调色自适应）
     $priceMiniIcon.Visibility = 'Collapsed'
-    if ($script:PriceIconPath -and (Test-Path (Join-Path $PSScriptRoot $script:PriceIconPath))) {
-        try {
-            $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
-            $bmp.BeginInit()
-            $bmp.UriSource = New-Object System.Uri((Join-Path $PSScriptRoot $script:PriceIconPath))
-            $bmp.EndInit()
-            $priceIconImg.Source = $bmp
-            $priceIconFallback.Visibility = 'Collapsed'
-        } catch {}
-    } else {
-        $priceIconImg.Visibility = 'Collapsed'
-    }
     Update-PriceDisplay
 
     # 版本号：从 package.json 动态读取（单一来源）

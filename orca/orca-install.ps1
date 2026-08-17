@@ -470,7 +470,8 @@ function Show-OrcaDialog {
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="$titleSafe" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        ShowInTaskbar="False" FontFamily="Microsoft YaHei UI" Topmost="True">
+        ShowInTaskbar="False" FontFamily="Microsoft YaHei UI" Topmost="True"
+        MaxWidth="520" MaxHeight="620">
   <Window.Resources>
     <!-- 次按钮：灰底描边 -->
     <Style x:Key="DlgGhost" TargetType="Button">
@@ -570,8 +571,10 @@ function Show-OrcaDialog {
               <TextBlock x:Name="dlgSub" Text="$($typeInfo.Sub)" FontSize="10.5" Foreground="#6E7180" Margin="0,3,0,0"/>
             </StackPanel>
           </StackPanel>
-          <TextBlock x:Name="dlgMsg" Text="$msgSafe" FontSize="13" Foreground="#A8AAB5" TextWrapping="Wrap"
-                     MaxWidth="420" LineHeight="22" Margin="0,18,0,0"/>
+          <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,18,0,0">
+            <TextBlock x:Name="dlgMsg" Text="$msgSafe" FontSize="13" Foreground="#A8AAB5" TextWrapping="Wrap"
+                       MaxWidth="420" LineHeight="22"/>
+          </ScrollViewer>
         </StackPanel>
         <!-- 按钮行 -->
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,22,20,20">
