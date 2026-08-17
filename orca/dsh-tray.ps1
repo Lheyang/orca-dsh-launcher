@@ -110,12 +110,12 @@ $miStatus.Enabled = $false
 $miVer.Enabled = $false
 $miVer.Text = 'Orca ' + $script:orcaVer
 $miOpen.Text    = '打开 DSH 界面'
-$miConsole.Text = '打开控制台…'
+$miConsole.Text = '打开管理界面'
 $miCheck.Text   = '检查更新'
 $miLog.Text     = '日志位置…'
 $miStart.Text   = '启动服务器'
 $miStop.Text    = '关闭服务器'
-$miQuit.Text    = '退出托盘（服务器不受影响）'
+$miQuit.Text    = '退出程序'
 
 $miOpen.add_Click({ Open-DshUi })
 $miConsole.add_Click({ Open-Console })
@@ -135,7 +135,16 @@ $miStop.add_Click({
         Show-UpdateBalloon -Title 'Orca' -Text $script:orcaLastServerError
     }
 })
-$miQuit.add_Click({ $notify.Visible = $false; [System.Windows.Forms.Application]::Exit() })
+$miQuit.add_Click({
+    # 退出程序：先关掉控制台窗口（如有），再退出托盘
+    try {
+        $closeEvt = [System.Threading.EventWaitHandle]::OpenExisting('Local\Orca-Console-Close')
+        $null = $closeEvt.Set()
+        $closeEvt.Dispose()
+    } catch {}
+    $notify.Visible = $false
+    [System.Windows.Forms.Application]::Exit()
+})
 
 [void]$menu.MenuItems.Add($miStatus)
 [void]$menu.MenuItems.Add($miVer)

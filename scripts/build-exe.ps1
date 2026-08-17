@@ -36,6 +36,7 @@ Write-Host "[1/5] ps2exe 就绪"
 $pluginFiles = @(
     (Join-Path $proj 'plugin.js'),
     (Join-Path $proj 'package.json'),
+    (Join-Path $proj 'lib'),
     (Join-Path $proj 'orca')
 )
 $zip = Join-Path $env:TEMP 'orca-plugin-payload.zip'

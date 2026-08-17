@@ -57,13 +57,22 @@ if ($args -contains '-QuickCheck') {
 }
 
 # 防止重复实例（控制台只开一个）
-# 先加载 WPF（自定义对话框需要），不加载主窗口
+# 已有一个实例在运行时：通知它显示到前台（最小化到托盘也能恢复），然后本实例退出
 Add-Type -AssemblyName PresentationFramework
 $mutex = New-Object System.Threading.Mutex($false, 'Local\DSH-Console-Single')
 if (-not $mutex.WaitOne(0, $false)) {
-    $null = Show-OrcaDialog -Title 'Orca DSH Launcher' -Message '控制台已经打开了，先看看托盘或任务栏。' -Type info -Buttons OK
+    try {
+        $showEvt = [System.Threading.EventWaitHandle]::OpenExisting('Local\Orca-Console-Show')
+        $null = $showEvt.Set()
+        $showEvt.Dispose()
+    } catch {}
     exit
 }
+# 恢复/关闭信号（与托盘配合）：托盘「打开管理界面」→ 显示；托盘「退出程序」→ 关闭
+$script:consoleShowEvent = $null
+$script:consoleCloseEvent = $null
+try { $script:consoleShowEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'Local\Orca-Console-Show') } catch {}
+try { $script:consoleCloseEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'Local\Orca-Console-Close') } catch {}
 
 # ---------- 任务栏图标：给进程设 AppUserModelID（powershell 是控制台程序，
 # ---------- 任务栏按钮默认用 exe 图标，设 AppID + 注册表图标后任务栏显示虎鲸）
@@ -897,7 +906,35 @@ $titleBar.Add_MouseLeftButtonDown({
     }
 })
 $btnMin.Add_Click({ $window.WindowState = 'Minimized' })
-$btnClose.Add_Click({ $window.Close() })
+# 关闭按钮 = 选项菜单：最小化到托盘 / 退出程序（默认退出，真正关闭进程）
+$btnClose.Add_Click({
+    try {
+        $menu = New-Object System.Windows.Controls.ContextMenu
+        $miTray = New-Object System.Windows.Controls.MenuItem
+        $miTray.Header = '最小化到托盘'
+        $miQuit = New-Object System.Windows.Controls.MenuItem
+        $miQuit.Header = '退出程序'
+        [void]$menu.Items.Add($miTray)
+        [void]$menu.Items.Add($miQuit)
+        $miTray.Add_Click({
+            $menu.IsOpen = $false
+            $window.Hide()
+            $lblStatus.Text = '已最小化到托盘（托盘「打开管理界面」可恢复）'
+        })
+        $miQuit.Add_Click({
+            $menu.IsOpen = $false
+            $window.Close()
+        })
+        # 回车 = 默认动作（退出程序，直接关闭）
+        $menu.Add_KeyDown({
+            if ($_.Key -eq 'Enter') { $menu.IsOpen = $false; $window.Close() }
+        })
+        $menu.PlacementTarget = $btnClose
+        $menu.Placement = 'Bottom'
+        $menu.IsOpen = $true
+        try { $miQuit.IsHighlighted = $true } catch {}   # 默认选中「退出程序」
+    } catch {}
+})
 
 # ---------- 刷新状态显示 ----------
 function Update-StatusDisplay {
@@ -1737,6 +1774,16 @@ $refreshTimer.Add_Tick({
         Update-StatusDisplay
         Update-PriceDisplay
         $null = Test-PeakReminderDue
+        # 托盘信号：收到「打开管理界面」→ 恢复显示；收到「退出程序」→ 关闭
+        if ($script:consoleShowEvent -and $script:consoleShowEvent.WaitOne(0)) {
+            $window.Show()
+            $window.WindowState = 'Normal'
+            $window.Activate()
+            $lblStatus.Text = '控制台已恢复'
+        }
+        if ($script:consoleCloseEvent -and $script:consoleCloseEvent.WaitOne(0)) {
+            $window.Close()
+        }
         if ($pageLogs.Visibility -eq 'Visible') { Update-LogDisplay }
         if ($script:pendingStart -and (Test-ServerRunning)) {
             $script:pendingStart = $false
@@ -1855,3 +1902,6 @@ $window.Add_Loaded({
 })
 
 $window.ShowDialog() | Out-Null
+
+# 确保进程真正退出（防止窗口关闭后进程残留，导致控制台再也打不开）
+[Environment]::Exit(0)

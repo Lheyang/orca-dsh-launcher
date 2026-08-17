@@ -312,6 +312,10 @@ function Install-OrcaPlugin {
         New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
         Copy-Item (Join-Path $PluginSource 'plugin.js') $targetDir -Force
         Copy-Item (Join-Path $PluginSource 'package.json') $targetDir -Force
+        if (Test-Path (Join-Path $PluginSource 'lib')) {
+            New-Item -ItemType Directory -Path (Join-Path $targetDir 'lib') -Force | Out-Null
+            Copy-Item (Join-Path $PluginSource 'lib\*') (Join-Path $targetDir 'lib') -Recurse -Force
+        }
         New-Item -ItemType Directory -Path (Join-Path $targetDir 'orca') -Force | Out-Null
         Copy-Item (Join-Path $PluginSource 'orca\*') (Join-Path $targetDir 'orca') -Recurse -Force
         Write-SetupLog '[插件] 文件已复制到 DSH 插件目录'

@@ -63,10 +63,14 @@ if (Test-Path $targetDir) {
     Copy-Item $targetDir $oldBackup -Recurse -Force
     Write-Host "[2/6] 检测到旧版本，已备份 -> backup\"
 }
-# 复制插件文件（plugin.js、package.json 和 orca 托盘资产）
+# 复制插件文件（plugin.js、package.json、lib 客户端包和 orca 托盘资产）
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 Copy-Item (Join-Path $projectRoot 'plugin.js') $targetDir -Force
 Copy-Item (Join-Path $projectRoot 'package.json') $targetDir -Force
+if (Test-Path (Join-Path $projectRoot 'lib')) {
+    New-Item -ItemType Directory -Path (Join-Path $targetDir 'lib') -Force | Out-Null
+    Copy-Item (Join-Path $projectRoot 'lib\*') (Join-Path $targetDir 'lib') -Recurse -Force
+}
 New-Item -ItemType Directory -Path (Join-Path $targetDir 'orca') -Force | Out-Null
 Copy-Item (Join-Path $projectRoot 'orca\*') (Join-Path $targetDir 'orca') -Recurse -Force
 Write-Host "[2/6] 插件已复制到 DSH 插件目录"
