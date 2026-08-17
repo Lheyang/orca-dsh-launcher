@@ -90,6 +90,20 @@ handler 返回 `{ kind: 'success' | 'error', text }`，每次执行重新读取�
 
 用户数据（**勿删**）：`orca-dsh-launcher.json`（配置）、`orca-stats.json`（使用统计，原子写入）、`orca-dsh-server.log`（服务器日志，>2MB 自动轮转）、`update-check-state.json`（更新检查结果）。
 
+## 截图
+
+![计费时段卡片](shots/billing.png)
+
+*计费时段卡片：实时提示 DeepSeek 峰谷计费状态（高峰/空闲时段、各模型单价），帮您错峰省钱。*
+
+![控制台概览](shots/console.png)
+
+*控制台概览：健康检查（DSH 服务器 / 更新检查 / Orca 托盘）一目了然。*
+
+![一键安装 DSH](shots/install.png)
+
+*一键安装页：完整版与官方 Web 版双路径，安装状态与实时日志。*
+
 ## 架构
 
 ```
@@ -164,6 +178,10 @@ Windows（PowerShell 5.1 / .NET Framework）。DSH 本体需要 Node.js 与 git�
 ## 变更记录
 
 [CHANGELOG.md](CHANGELOG.md)
+
+## 给 LLM / 爬虫
+
+本仓库为 AI 助手与爬虫提供机器可读的项目说明：[llms.txt](llms.txt)（概要）与 [llms-full.txt](llms-full.txt)（全文），内容与 README 同步维护。
 
 ## 许可证
 

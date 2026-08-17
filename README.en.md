@@ -90,6 +90,20 @@ The handler returns `{ kind: 'success' | 'error', text }`; the config is re-read
 
 User data (**do not delete**): `orca-dsh-launcher.json` (config), `orca-stats.json` (usage stats, atomic writes), `orca-dsh-server.log` (server log, auto-rotated above 2MB), `update-check-state.json` (update check results).
 
+## Screenshots
+
+![Billing period card](shots/billing.png)
+
+*Billing period card: real-time DeepSeek peak/off-peak billing status (peak/off-peak hours, per-model prices) to help you save money.*
+
+![Console overview](shots/console.png)
+
+*Console overview: health checks (DSH server / update check / Orca tray) at a glance.*
+
+![One-click DSH install](shots/install.png)
+
+*Install page: both full-version and official Web-version paths, with install status and real-time logs.*
+
 ## Architecture
 
 ```
@@ -164,6 +178,10 @@ That is DSH's official minimal launch method (Node.js only); this plugin enhance
 ## Changelog
 
 [CHANGELOG.md](CHANGELOG.md)
+
+## For LLM crawlers
+
+This repository ships machine-readable project docs for AI assistants and crawlers: [llms.txt](llms.txt) (overview) and [llms-full.txt](llms-full.txt) (full text), maintained in sync with this README.
 
 ## License
 
