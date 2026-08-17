@@ -428,6 +428,7 @@ $script:pendingStart = $false    # 正在启动服务器
                       <ColumnDefinition Width="Auto"/>
                       <ColumnDefinition Width="*"/>
                       <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="✓" FontSize="16" Foreground="{DynamicResource ColorAccent}" VerticalAlignment="Center"/>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
@@ -437,6 +438,7 @@ $script:pendingStart = $false    # 正在启动服务器
                     <Border Grid.Column="2" Style="{StaticResource StatusTag}">
                       <TextBlock x:Name="cardTrayTag" Text="运行中" FontSize="11" Foreground="{DynamicResource ColorTagOkFg}"/>
                     </Border>
+                    <Button x:Name="btnStartTray" Grid.Column="3" Content="启动托盘" Style="{StaticResource SecondaryButton}" Width="72" Height="24" Margin="10,0,0,0" FontSize="11" Visibility="Collapsed"/>
                   </Grid>
                 </Border>
               </StackPanel>
@@ -685,6 +687,7 @@ $cardServerTag = $window.FindName('cardServerTag')
 $cardUpdateSub = $window.FindName('cardUpdateSub')
 $cardUpdateTag = $window.FindName('cardUpdateTag')
 $cardTrayTag   = $window.FindName('cardTrayTag')
+$btnStartTray  = $window.FindName('btnStartTray')
 $btnOpenOverview = $window.FindName('btnOpenOverview')
 $btnCheckOverview= $window.FindName('btnCheckOverview')
 $btnUpdateDsh = $window.FindName('btnUpdateDsh')
@@ -904,6 +907,16 @@ $window.Add_PreviewMouseDown({
     } catch {}
     if (-not $isInside) { $exitPanel.Visibility = 'Collapsed' }
 })
+# 托盘未运行时，概览页「启动托盘」按钮
+$btnStartTray.Add_Click({
+    $vbs = Join-Path $PSScriptRoot 'start-tray.vbs'
+    if (Test-Path $vbs) {
+        Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$vbs`"" -WindowStyle Hidden
+        $lblStatus.Text = '正在启动托盘…（几秒后右下角出现虎鲸图标）'
+    } else {
+        $lblStatus.Text = '托盘启动器缺失，请重装插件'
+    }
+})
 
 # ---------- 刷新状态显示 ----------
 function Update-StatusDisplay {
@@ -977,10 +990,12 @@ function Update-StatusDisplay {
             $cardTrayTag.Text = '运行中'
             $cardTrayTag.Foreground = $window.Resources['ColorTagOkFg']
             $cardTrayTag.Parent.Background = $window.Resources['ColorTagOkBg']
+            $btnStartTray.Visibility = 'Collapsed'
         } else {
             $cardTrayTag.Text = '未运行'
             $cardTrayTag.Foreground = $window.Resources['ColorTagNeutralFg']
             $cardTrayTag.Parent.Background = $window.Resources['ColorTagNeutralBg']
+            $btnStartTray.Visibility = 'Visible'
         }
 
         # 更新状态：优先用最近一次检查结果，否则读插件写的状态文件
