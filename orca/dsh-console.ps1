@@ -69,10 +69,13 @@ if (-not $mutex.WaitOne(0, $false)) {
     exit
 }
 # 恢复/关闭信号（与托盘配合）：托盘「打开管理界面」→ 显示；托盘「退出程序」→ 关闭
+# 托盘退出联动：控制台「退出程序」→ 通知托盘一起退出
 $script:consoleShowEvent = $null
 $script:consoleCloseEvent = $null
+$script:trayCloseEvent = $null
 try { $script:consoleShowEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'Local\Orca-Console-Show') } catch {}
 try { $script:consoleCloseEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'Local\Orca-Console-Close') } catch {}
+try { $script:trayCloseEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'Local\Orca-Tray-Close') } catch {}
 
 # ---------- 任务栏图标：给进程设 AppUserModelID（powershell 是控制台程序，
 # ---------- 任务栏按钮默认用 exe 图标，设 AppID + 注册表图标后任务栏显示虎鲸）
@@ -111,7 +114,7 @@ $script:pendingStart = $false    # 正在启动服务器
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Name="MainWindow"
         Title="Orca DSH Launcher 控制台"
-        Width="780" Height="580"
+        Width="780" Height="620"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
         FontFamily="Microsoft YaHei UI">
@@ -309,35 +312,6 @@ $script:pendingStart = $false    # 正在启动服务器
               <Trigger Property="IsChecked" Value="True">
                 <Setter TargetName="ring" Property="BorderBrush" Value="#F0F0F0"/>
                 <Setter TargetName="ck" Property="Visibility" Value="Visible"/>
-              </Trigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
-    </Style>
-    <!-- 关闭按钮选项菜单（单色，随主题自适应） -->
-    <Style x:Key="OrcaMenuStyle" TargetType="ContextMenu">
-      <Setter Property="Background" Value="{DynamicResource ColorCard}"/>
-      <Setter Property="Foreground" Value="{DynamicResource ColorTextPrimary}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource ColorBorder}"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="Padding" Value="4"/>
-      <Setter Property="FontSize" Value="12"/>
-    </Style>
-    <Style x:Key="OrcaMenuItemStyle" TargetType="MenuItem">
-      <Setter Property="Foreground" Value="{DynamicResource ColorTextPrimary}"/>
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="Padding" Value="12,7"/>
-      <Setter Property="Cursor" Value="Hand"/>
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="MenuItem">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
-              <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
-            </Border>
-            <ControlTemplate.Triggers>
-              <Trigger Property="IsHighlighted" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ColorNavHover}"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -574,6 +548,8 @@ $script:pendingStart = $false    # 正在启动服务器
 
             <!-- ═══ 设置页 ═══ -->
             <StackPanel x:Name="pageSettings" CacheMode="BitmapCache" Visibility="Collapsed">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
               <TextBlock Text="设置" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
               <TextBlock Text="修改后点保存，立即生效" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
 
@@ -642,6 +618,8 @@ $script:pendingStart = $false    # 正在启动服务器
               </Border>
 
               <Button x:Name="btnSave" Content="保存设置" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" Width="120" Height="34" Margin="0,16,0,0"/>
+                </StackPanel>
+              </ScrollViewer>
             </StackPanel>
 
             <!-- ═══ 关于页 ═══ -->
@@ -663,6 +641,17 @@ $script:pendingStart = $false    # 正在启动服务器
           <TextBlock x:Name="lblStatus" Grid.Row="1" Text="就绪" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="24,10,24,14"/>
         </Grid>
       </Grid>
+
+      <!-- 退出选项面板（内嵌，替代弹出菜单；默认动作=退出程序） -->
+      <Border x:Name="exitPanel" Grid.RowSpan="2" HorizontalAlignment="Right" VerticalAlignment="Top"
+              Margin="0,48,8,0" CornerRadius="8" Background="{DynamicResource ColorCard}"
+              BorderBrush="{DynamicResource ColorBorder}" BorderThickness="1" Padding="4"
+              Visibility="Collapsed" Panel.ZIndex="100">
+        <StackPanel MinWidth="140">
+          <Button x:Name="btnExitToTray" Content="最小化到托盘" Style="{StaticResource SecondaryButton}" Height="30" Margin="0,0,0,4" HorizontalAlignment="Stretch" FontSize="12"/>
+          <Button x:Name="btnExitQuit" Content="退出程序" Style="{StaticResource PrimaryButton}" Height="30" HorizontalAlignment="Stretch" FontSize="12"/>
+        </StackPanel>
+      </Border>
     </Grid>
   </Border>
 </Window>
@@ -676,6 +665,9 @@ $window = [System.Windows.Markup.XamlReader]::Load($reader)
 $titleBar   = $window.FindName('titleBar')
 $btnMin     = $window.FindName('btnMin')
 $btnClose   = $window.FindName('btnClose')
+$exitPanel  = $window.FindName('exitPanel')
+$btnExitToTray = $window.FindName('btnExitToTray')
+$btnExitQuit   = $window.FindName('btnExitQuit')
 $navOverview= $window.FindName('navOverview')
 $navServer  = $window.FindName('navServer')
 $navInstall = $window.FindName('navInstall')
@@ -876,39 +868,41 @@ $titleBar.Add_MouseLeftButtonDown({
         }
     }
 })
-$btnMin.Add_Click({ $window.WindowState = 'Minimized' })
-# 关闭按钮 = 选项菜单：最小化到托盘 / 退出程序（默认退出，真正关闭进程）
+$btnMin.Add_Click({ $window.WindowState = 'Minimized'; $exitPanel.Visibility = 'Collapsed' })
+# 关闭按钮 = 内嵌选项面板：最小化到托盘 / 退出程序（默认退出）
 $btnClose.Add_Click({
+    if ($exitPanel.Visibility -eq 'Visible') {
+        $exitPanel.Visibility = 'Collapsed'
+    } else {
+        $exitPanel.Visibility = 'Visible'
+        $btnExitQuit.Focus()
+    }
+})
+# 最小化到托盘（窗口隐藏，进程保留；托盘「打开管理界面」可恢复）
+$btnExitToTray.Add_Click({
+    $exitPanel.Visibility = 'Collapsed'
+    $window.Hide()
+    $lblStatus.Text = '已最小化到托盘（托盘「打开管理界面」可恢复）'
+})
+# 退出程序：通知托盘一起退出，然后真正关闭控制台进程
+$btnExitQuit.Add_Click({
+    $exitPanel.Visibility = 'Collapsed'
+    try { if ($script:trayCloseEvent) { $null = $script:trayCloseEvent.Set() } } catch {}
+    $window.Close()
+})
+# 点击面板以外的地方 → 收起面板
+$window.Add_PreviewMouseDown({
+    if ($exitPanel.Visibility -ne 'Visible') { return }
+    $target = $_.OriginalSource
+    $isInside = $false
     try {
-        $menu = New-Object System.Windows.Controls.ContextMenu
-        $miTray = New-Object System.Windows.Controls.MenuItem
-        $miTray.Header = '最小化到托盘'
-        $miQuit = New-Object System.Windows.Controls.MenuItem
-        $miQuit.Header = '退出程序'
-        # 单色主题样式（随深/浅主题自适应）
-        $menu.Style = $window.FindResource('OrcaMenuStyle')
-        $miTray.Style = $window.FindResource('OrcaMenuItemStyle')
-        $miQuit.Style = $window.FindResource('OrcaMenuItemStyle')
-        [void]$menu.Items.Add($miTray)
-        [void]$menu.Items.Add($miQuit)
-        $miTray.Add_Click({
-            $menu.IsOpen = $false
-            $window.Hide()
-            $lblStatus.Text = '已最小化到托盘（托盘「打开管理界面」可恢复）'
-        })
-        $miQuit.Add_Click({
-            $menu.IsOpen = $false
-            $window.Close()
-        })
-        # 回车 = 默认动作（退出程序，直接关闭）
-        $menu.Add_KeyDown({
-            if ($_.Key -eq 'Enter') { $menu.IsOpen = $false; $window.Close() }
-        })
-        $menu.PlacementTarget = $btnClose
-        $menu.Placement = 'Bottom'
-        $menu.IsOpen = $true
-        try { $miQuit.IsHighlighted = $true } catch {}   # 默认选中「退出程序」
+        $el = $target
+        while ($el -and $el -is [System.Windows.DependencyObject]) {
+            if ($el -eq $exitPanel -or $el -eq $btnClose) { $isInside = $true; break }
+            $el = [System.Windows.Media.VisualTreeHelper]::GetParent($el)
+        }
     } catch {}
+    if (-not $isInside) { $exitPanel.Visibility = 'Collapsed' }
 })
 
 # ---------- 刷新状态显示 ----------

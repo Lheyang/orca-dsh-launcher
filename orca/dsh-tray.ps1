@@ -206,4 +206,20 @@ if ($testMode) {
     $t.Start()
 }
 
+# ---------- 与控制台联动（合并成一体） ----------
+# 控制台「退出程序」→ 通过信号通知托盘一起退出
+$script:trayCloseEvent = $null
+try { $script:trayCloseEvent = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'Local\Orca-Tray-Close') } catch {}
+$closePoller = New-Object System.Windows.Forms.Timer
+$closePoller.Interval = 1000
+$closePoller.add_Tick({
+    try {
+        if ($script:trayCloseEvent -and $script:trayCloseEvent.WaitOne(0)) {
+            $notify.Visible = $false
+            [System.Windows.Forms.Application]::Exit()
+        }
+    } catch {}
+})
+$closePoller.Start()
+
 [System.Windows.Forms.Application]::Run()
