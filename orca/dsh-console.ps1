@@ -366,7 +366,8 @@ $script:pendingStart = $false    # 正在启动服务器
           <Grid Grid.Row="0" Margin="24,16,24,0">
 
             <!-- ═══ 概览页 ═══ -->
-            <StackPanel x:Name="pageOverview" CacheMode="BitmapCache">
+            <Grid x:Name="pageOverview" CacheMode="BitmapCache">
+              <StackPanel>
               <TextBlock Text="概览" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
               <TextBlock Text="检查问题、启动与快速修复" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
               <TextBlock Text="健康检查" FontSize="14" Foreground="{DynamicResource ColorTextPrimary}" Margin="0,18,0,0"/>
@@ -435,7 +436,45 @@ $script:pendingStart = $false    # 正在启动服务器
                 <Button x:Name="btnCheckOverview" Content="检查更新" Style="{StaticResource SecondaryButton}" Width="120" Height="36" Margin="10,0,0,0"/>
                 <Button x:Name="btnUpdateDsh" Content="更新 DSH…" Style="{StaticResource SecondaryButton}" Width="120" Height="36" Margin="10,0,0,0"/>
               </StackPanel>
-            </StackPanel>
+
+              <!-- 计费时段卡片（可收纳；收纳后变成可拖动小图标） -->
+              <Border x:Name="priceCard" CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="14,12" Margin="0,10,0,0">
+                <StackPanel>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="💰" FontSize="16" Foreground="{DynamicResource ColorAccent}" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Text="计费时段（DeepSeek 峰谷定价）" FontSize="13" Foreground="{DynamicResource ColorTextPrimary}"/>
+                      <TextBlock Text="北京时间 09:00-12:00、14:00-18:00 为高峰" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Border Grid.Column="2" Style="{StaticResource StatusTag}">
+                      <TextBlock x:Name="priceCardTag" Text="计算中…" FontSize="11" Foreground="{DynamicResource ColorTagNeutralFg}"/>
+                    </Border>
+                    <Button x:Name="btnPriceCollapse" Grid.Column="3" Content="— 收起" FontSize="10" Width="52" Height="22" Margin="10,0,0,0" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource ColorTextMuted}" Cursor="Hand" ToolTip="收起为小图标"/>
+                  </Grid>
+                  <TextBlock x:Name="priceCardCountdown" Text="…" FontSize="11" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="priceCardSchedule" Text="…" FontSize="11" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="priceCardPrice" Text="…" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                  <TextBlock Text="ⓘ 规则来自 DeepSeek 官方公告（2026-08-17 起生效），如有调整以官方为准" FontSize="10" Foreground="{DynamicResource ColorTextMuted}" Margin="0,4,0,0"/>
+                </StackPanel>
+              </Border>
+              </StackPanel>
+
+              <!-- 收纳态悬浮图标（可拖动自由摆放；图标图片先留空，占位符为 💰） -->
+              <Canvas>
+                <Border x:Name="priceMiniIcon" Canvas.Left="500" Canvas.Top="8" Width="32" Height="32" CornerRadius="6" Background="{DynamicResource ColorCard}" BorderBrush="{DynamicResource ColorBorder}" BorderThickness="1" Cursor="Hand" ToolTip="点击展开计费时段卡片">
+                  <Grid>
+                    <Image x:Name="priceIconImg" Width="22" Height="22" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="priceIconFallback" Text="💰" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource ColorTextPrimary}"/>
+                  </Grid>
+                </Border>
+              </Canvas>
+            </Grid>
 
             <!-- ═══ 服务器页 ═══ -->
             <StackPanel x:Name="pageServer" CacheMode="BitmapCache" Visibility="Collapsed">
@@ -571,6 +610,14 @@ $script:pendingStart = $false    # 正在启动服务器
                 </StackPanel>
               </Border>
 
+              <!-- 计费提醒 -->
+              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,10,0,0">
+                <StackPanel>
+                  <TextBlock Text="计费提醒" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" Margin="0,0,0,10"/>
+                  <CheckBox x:Name="chkPeakReminder" Content="高峰开始前 15 分钟提醒（DeepSeek 峰谷计费，高峰价约为空闲的 2 倍）" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" Margin="0,3,0,3"/>
+                </StackPanel>
+              </Border>
+
               <!-- 外观 -->
               <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,10,0,0">
                 <StackPanel>
@@ -668,6 +715,16 @@ $btnRestartServer = $window.FindName('btnRestartServer')
 $installCardIcon = $window.FindName('installCardIcon')
 $installCardSub  = $window.FindName('installCardSub')
 $installCardTag  = $window.FindName('installCardTag')
+$priceCard         = $window.FindName('priceCard')
+$priceCardTag      = $window.FindName('priceCardTag')
+$priceCardCountdown= $window.FindName('priceCardCountdown')
+$priceCardSchedule = $window.FindName('priceCardSchedule')
+$priceCardPrice    = $window.FindName('priceCardPrice')
+$btnPriceCollapse  = $window.FindName('btnPriceCollapse')
+$priceMiniIcon     = $window.FindName('priceMiniIcon')
+$priceIconImg      = $window.FindName('priceIconImg')
+$priceIconFallback = $window.FindName('priceIconFallback')
+$chkPeakReminder   = $window.FindName('chkPeakReminder')
 $installHelp     = $window.FindName('installHelp')
 $btnInstallFull  = $window.FindName('btnInstallFull')
 $btnInstallWeb   = $window.FindName('btnInstallWeb')
@@ -745,6 +802,7 @@ function Apply-Theme([bool]$isDark) {
         $t['ColorTagOkBg']='#1C3A2E'; $t['ColorTagOkFg']='#36D199'
         $t['ColorTagWarnBg']='#3A3222'; $t['ColorTagWarnFg']='#E8B34A'
         $t['ColorTagNeutralBg']='#2D2D2D'; $t['ColorTagNeutralFg']='#9A9A9A'
+        $t['ColorTagDangerBg']='#3A2226'; $t['ColorTagDangerFg']='#F07878'
     } else {
         $t['ColorBg']='#F5F5F7'; $t['ColorBorder']='#D9D9DE'; $t['ColorSidebar']='#ECECEF'
         $t['ColorCard']='#FFFFFF'; $t['ColorInput']='#FFFFFF'; $t['ColorInputBorder']='#C8C8CE'
@@ -758,6 +816,7 @@ function Apply-Theme([bool]$isDark) {
         $t['ColorTagOkBg']='#DDF3E8'; $t['ColorTagOkFg']='#1E8A52'
         $t['ColorTagWarnBg']='#FBF0DC'; $t['ColorTagWarnFg']='#B07A1E'
         $t['ColorTagNeutralBg']='#E9E9EC'; $t['ColorTagNeutralFg']='#6E6E76'
+        $t['ColorTagDangerBg']='#F6DFDF'; $t['ColorTagDangerFg']='#C0392B'
     }
     foreach ($k in $t.Keys) {
         $brush = New-Brush $t[$k]
@@ -953,6 +1012,141 @@ function Update-StatusDisplay {
         Update-InstallCard
     } catch {}
 }
+
+# ---------- 计费时段卡片（DeepSeek 峰谷定价） ----------
+# 收纳态图标图片：您提供图片后，把图片放到本目录（orca\），并把下面的文件名改好（如 'price-icon.png'）
+$script:PriceIconPath = ''
+$script:priceMiniDragging = $false
+$script:priceMiniDragStartX = 0
+$script:priceMiniDragStartY = 0
+$script:priceMiniOrigLeft = 0
+$script:priceMiniOrigTop = 0
+$script:priceMiniMoved = $false
+$script:peakRemindedFor = @()          # 已提醒过的高峰窗口（去重用）
+
+# 刷新计费卡片内容（定时器每 4 秒调用）
+function Update-PriceDisplay {
+    try {
+        $p = Get-PricePeriod
+        if ($p.Period -eq 'peak') {
+            $priceCardTag.Text = '🔴 高峰时段'
+            $priceCardTag.Foreground = $window.Resources['ColorTagDangerFg']
+            $priceCardTag.Parent.Background = $window.Resources['ColorTagDangerBg']
+        } else {
+            $priceCardTag.Text = '🟢 空闲时段（半价）'
+            $priceCardTag.Foreground = $window.Resources['ColorTagOkFg']
+            $priceCardTag.Parent.Background = $window.Resources['ColorTagOkBg']
+        }
+        $priceCardCountdown.Text = $p.NextChangeText
+        $priceCardSchedule.Text  = $p.TodayScheduleText
+        $priceCardPrice.Text     = $p.PriceText
+    } catch {}
+}
+
+# 高峰开始前提醒（每个高峰窗口只提醒一次）；返回 $true 表示本次弹了提醒
+function Test-PeakReminderDue {
+    if (-not $script:orcaCfgPeakReminder) { return $false }
+    try {
+        $beijing = [DateTime]::UtcNow.AddHours(8)
+        $nowMin = $beijing.Hour * 60 + $beijing.Minute
+        $lead = [Math]::Max(1, [int]$script:orcaCfgPeakReminderMin)
+        foreach ($w in (Get-PeakWindows)) {
+            $remindStart = $w.StartMin - $lead
+            if ($remindStart -lt 0) { continue }   # 跨午夜窗口的提前提醒暂不支持，跳过
+            if ($nowMin -ge $remindStart -and $nowMin -lt $w.StartMin) {
+                $key = $beijing.ToString('yyyy-MM-dd') + ' ' + $w.Spec
+                if ($script:peakRemindedFor -notcontains $key) {
+                    $script:peakRemindedFor += $key
+                    Show-NotificationToast "高峰时段 $($w.Spec) 即将开始，此时调用价格为高峰价（约为空闲时段的 2 倍）。不急的任务建议等空闲时段再跑。"
+                    return $true
+                }
+            }
+        }
+    } catch {}
+    return $false
+}
+
+# 右上角弹出小通知（不依赖托盘，8 秒自动消失）
+function Show-NotificationToast([string]$message) {
+    try {
+        $toast = New-Object System.Windows.Window
+        $toast.Title = 'Orca 提醒'
+        $toast.Width = 360
+        $toast.Height = 96
+        $toast.WindowStyle = [System.Windows.WindowStyle]::ToolWindow
+        $toast.ResizeMode = 'NoResize'
+        $toast.Topmost = $true
+        $toast.ShowInTaskbar = $false
+        $toast.WindowStartupLocation = 'Manual'
+        $toast.Left = [System.Windows.SystemParameters]::WorkArea.Right - 380
+        $toast.Top = [System.Windows.SystemParameters]::WorkArea.Top + 20
+        $toast.Background = New-Brush '#1E1E1E'
+        $sp = New-Object System.Windows.Controls.StackPanel
+        $sp.Margin = '12,10'
+        $t1 = New-Object System.Windows.Controls.TextBlock
+        $t1.Text = '⏰ 高峰时段即将开始'
+        $t1.FontSize = 13
+        $t1.FontWeight = 'Bold'
+        $t1.Foreground = New-Brush '#F07878'
+        $t2 = New-Object System.Windows.Controls.TextBlock
+        $t2.Text = $message
+        $t2.FontSize = 11
+        $t2.TextWrapping = 'Wrap'
+        $t2.Margin = '0,6,0,0'
+        $t2.Foreground = New-Brush '#E0E0E0'
+        $sp.Children.Add($t1) | Out-Null
+        $sp.Children.Add($t2) | Out-Null
+        $toast.Content = $sp
+        $toast.Show()
+        $timer = New-Object System.Windows.Threading.DispatcherTimer
+        $timer.Interval = [TimeSpan]::FromSeconds(8)
+        $timer.Add_Tick({ try { $toast.Close() } catch {}; $timer.Stop() })
+        $timer.Start()
+    } catch {}
+}
+
+# 展开 / 收纳切换
+$btnPriceCollapse.Add_Click({
+    $priceCard.Visibility = 'Collapsed'
+    $priceMiniIcon.Visibility = 'Visible'
+    $lblStatus.Text = '计费卡片已收起为小图标（可拖动换位置，点击展开）'
+})
+$priceMiniIcon.Add_MouseLeftButtonDown({
+    param($s, $e)
+    $script:priceMiniDragging = $true
+    $script:priceMiniMoved = $false
+    $script:priceMiniOrigLeft = [double]$priceMiniIcon.GetValue([System.Windows.Controls.Canvas]::LeftProperty)
+    $script:priceMiniOrigTop  = [double]$priceMiniIcon.GetValue([System.Windows.Controls.Canvas]::TopProperty)
+    $script:priceMiniDragStartX = $e.GetPosition($pageOverview).X - $script:priceMiniOrigLeft
+    $script:priceMiniDragStartY = $e.GetPosition($pageOverview).Y - $script:priceMiniOrigTop
+    $priceMiniIcon.CaptureMouse()
+})
+$priceMiniIcon.Add_MouseMove({
+    param($s, $e)
+    if (-not $script:priceMiniDragging) { return }
+    $pos = $e.GetPosition($pageOverview)
+    $newLeft = $pos.X - $script:priceMiniDragStartX
+    $newTop  = $pos.Y - $script:priceMiniDragStartY
+    if ([Math]::Abs($newLeft - $script:priceMiniOrigLeft) -gt 5 -or [Math]::Abs($newTop - $script:priceMiniOrigTop) -gt 5) {
+        $script:priceMiniMoved = $true
+    }
+    $maxLeft = [Math]::Max(0, $pageOverview.ActualWidth - 34)
+    $maxTop  = [Math]::Max(0, $pageOverview.ActualHeight - 34)
+    $newLeft = [Math]::Max(0, [Math]::Min($maxLeft, $newLeft))
+    $newTop  = [Math]::Max(0, [Math]::Min($maxTop, $newTop))
+    $priceMiniIcon.SetValue([System.Windows.Controls.Canvas]::LeftProperty, $newLeft)
+    $priceMiniIcon.SetValue([System.Windows.Controls.Canvas]::TopProperty, $newTop)
+})
+$priceMiniIcon.Add_MouseLeftButtonUp({
+    param($s, $e)
+    $priceMiniIcon.ReleaseMouseCapture()
+    $script:priceMiniDragging = $false
+    if (-not $script:priceMiniMoved) {
+        # 没拖动 = 单击 → 展开卡片
+        $priceMiniIcon.Visibility = 'Collapsed'
+        $priceCard.Visibility = 'Visible'
+    }
+})
 
 # ---------- 刷新安装页卡片 ----------
 function Update-InstallCard {
@@ -1467,7 +1661,7 @@ $btnSave.Add_Click({
         elseif ($rdoAccentSlate.IsChecked) { $newAccent = 'slate' }
 
         # 1) 写共享配置
-        if (-not (Write-OrcaConfig -Port $newPort -DshDir $newDshDir -TrayAutoStart $chkTrayAuto.IsChecked -Theme $newTheme -Accent $newAccent)) {
+        if (-not (Write-OrcaConfig -Port $newPort -DshDir $newDshDir -TrayAutoStart $chkTrayAuto.IsChecked -Theme $newTheme -Accent $newAccent -PeakReminder $chkPeakReminder.IsChecked)) {
             throw '写入配置文件失败'
         }
 
@@ -1519,6 +1713,8 @@ $refreshTimer.Add_Tick({
     $script:refreshBusy = $true
     try {
         Update-StatusDisplay
+        Update-PriceDisplay
+        $null = Test-PeakReminderDue
         if ($pageLogs.Visibility -eq 'Visible') { Update-LogDisplay }
         if ($script:pendingStart -and (Test-ServerRunning)) {
             $script:pendingStart = $false
@@ -1595,6 +1791,23 @@ $window.Add_Loaded({
     $startupLnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'Orca DSH Launcher.lnk'
     $chkStartup.IsChecked = (Test-Path $startupLnk)
     $chkDshAutoStart.IsChecked = Test-DshAutoStart
+    # 计费提醒开关（高峰开始前 15 分钟提醒）
+    $chkPeakReminder.IsChecked = $script:orcaCfgPeakReminder
+    # 计费卡片初始状态：默认展开；收纳图标图片待用户提供（占位符 💰）
+    $priceMiniIcon.Visibility = 'Collapsed'
+    if ($script:PriceIconPath -and (Test-Path (Join-Path $PSScriptRoot $script:PriceIconPath))) {
+        try {
+            $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
+            $bmp.BeginInit()
+            $bmp.UriSource = New-Object System.Uri((Join-Path $PSScriptRoot $script:PriceIconPath))
+            $bmp.EndInit()
+            $priceIconImg.Source = $bmp
+            $priceIconFallback.Visibility = 'Collapsed'
+        } catch {}
+    } else {
+        $priceIconImg.Visibility = 'Collapsed'
+    }
+    Update-PriceDisplay
 
     # 版本号：从 package.json 动态读取（单一来源）
     try {

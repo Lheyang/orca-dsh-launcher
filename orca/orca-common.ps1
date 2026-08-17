@@ -21,6 +21,8 @@ $script:orcaCfgTimeoutMs = 8000
 $script:orcaCfgTrayAutoStart = $true
 $script:orcaCfgTheme     = 'dark'
 $script:orcaCfgAccent    = 'blue'
+$script:orcaCfgPeakReminder   = $false   # 高峰时段开始前提醒开关
+$script:orcaCfgPeakReminderMin = 15      # 提前多少分钟提醒
 
 # ============================================================
 # 一、配置读写
@@ -36,6 +38,8 @@ function Read-OrcaConfig {
     $script:orcaCfgTrayAutoStart = $true
     $script:orcaCfgTheme     = 'dark'
     $script:orcaCfgAccent    = 'blue'
+    $script:orcaCfgPeakReminder   = $false
+    $script:orcaCfgPeakReminderMin = 15
 
     if (Test-Path $script:orcaConfigFile) {
         try {
@@ -48,6 +52,8 @@ function Read-OrcaConfig {
             if ($null -ne $cfg.trayAutoStart) { $script:orcaCfgTrayAutoStart = [bool]$cfg.trayAutoStart }
             if ($cfg.theme -eq 'light' -or $cfg.theme -eq 'dark') { $script:orcaCfgTheme = [string]$cfg.theme }
             if ($cfg.accent -in @('green','blue','purple','amber','rose','slate')) { $script:orcaCfgAccent = [string]$cfg.accent }
+            if ($null -ne $cfg.peakReminder)   { $script:orcaCfgPeakReminder = [bool]$cfg.peakReminder }
+            if ($cfg.peakReminderMin -gt 0)    { $script:orcaCfgPeakReminderMin = [int]$cfg.peakReminderMin }
         } catch {}
     }
 }
@@ -59,10 +65,13 @@ function Write-OrcaConfig {
         [string]$DshDir,
         [bool]$TrayAutoStart,
         [string]$Theme = 'dark',
-        [string]$Accent = 'blue'
+        [string]$Accent = 'blue',
+        [bool]$PeakReminder = $false,
+        [int]$PeakReminderMin = 15
     )
     if ($Theme -ne 'light' -and $Theme -ne 'dark') { $Theme = 'dark' }
     if ($Accent -notin @('green','blue','purple','amber','rose','slate')) { $Accent = 'blue' }
+    if ($PeakReminderMin -lt 1) { $PeakReminderMin = 15 }
     $cfg = [ordered]@{
         dshDir         = $DshDir
         port           = $Port
@@ -72,7 +81,18 @@ function Write-OrcaConfig {
         trayAutoStart  = $TrayAutoStart
         theme          = $Theme
         accent         = $Accent
+        peakReminder   = $PeakReminder
+        peakReminderMin = $PeakReminderMin
     }
+    # 保留配置文件里其它手动加的字段（如 peakWindows 时段自定义），防止保存时被清掉
+    try {
+        if (Test-Path $script:orcaConfigFile) {
+            $old = Get-Content $script:orcaConfigFile -Raw | ConvertFrom-Json
+            foreach ($prop in $old.PSObject.Properties) {
+                if (-not $cfg.Contains($prop.Name)) { $cfg[$prop.Name] = $prop.Value }
+            }
+        }
+    } catch {}
     try {
         $dir = Split-Path -Parent $script:orcaConfigFile
         if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
@@ -84,6 +104,113 @@ function Write-OrcaConfig {
         return $true
     } catch {
         return $false
+    }
+}
+
+# ============================================================
+# 二、计费时段（DeepSeek 峰谷定价）
+#  官方规则（2026-08-17 起生效）：高峰 = 北京时间 09:00-12:00、14:00-18:00，
+#  其余为空闲时段（价格为高峰的一半）。
+#  一律按北京时间(UTC+8)计算，与电脑所在时区无关。
+#  高峰时段可被配置文件 peakWindows 覆盖（如 "09:00-12:00,14:00-18:00"）。
+# ============================================================
+$script:PeakWindowsDefault = @('09:00-12:00', '14:00-18:00')
+
+# 解析 "HH:mm-HH:mm" → @{ StartMin; EndMin; Spec }（单位：当日分钟数 0-1439），失败返回 $null
+function ConvertTo-PeakWindow([string]$spec) {
+    try {
+        $parts = $spec -split '-'
+        if ($parts.Count -ne 2) { return $null }
+        $s = $parts[0].Trim().Split(':')
+        $e = $parts[1].Trim().Split(':')
+        if ($s.Count -ne 2 -or $e.Count -ne 2) { return $null }
+        $sm = [int]$s[0] * 60 + [int]$s[1]
+        $em = [int]$e[0] * 60 + [int]$e[1]
+        if ($sm -lt 0 -or $sm -ge 1440 -or $em -le $sm -or $em -gt 1440) { return $null }
+        return @{ StartMin = $sm; EndMin = $em; Spec = $spec.Trim() }
+    } catch { return $null }
+}
+
+# 取生效的高峰时段列表（配置文件 peakWindows 优先，其次官方默认）
+function Get-PeakWindows {
+    try {
+        if (Test-Path $script:orcaConfigFile) {
+            $cfg = Get-Content $script:orcaConfigFile -Raw | ConvertFrom-Json
+            if ($cfg -and $cfg.peakWindows) {
+                $list = @()
+                foreach ($w in ([string]$cfg.peakWindows -split ',')) {
+                    $p = ConvertTo-PeakWindow $w
+                    if ($p) { $list += $p }
+                }
+                if ($list.Count -gt 0) { return $list }
+            }
+        }
+    } catch {}
+    $def = @()
+    foreach ($w in $script:PeakWindowsDefault) {
+        $p = ConvertTo-PeakWindow $w
+        if ($p) { $def += $p }
+    }
+    return $def
+}
+
+# 计算当前计费时段状态
+# 返回 @{ Period='peak'|'idle'; StatusText; NextChangeText; TodayScheduleText; PriceText; BeijingNow }
+function Get-PricePeriod {
+    $beijing = [DateTime]::UtcNow.AddHours(8)
+    $nowMin  = $beijing.Hour * 60 + $beijing.Minute
+    $windows = Get-PeakWindows
+
+    # 1) 当前是否高峰
+    $inPeak = $false
+    $inWindow = $null
+    foreach ($w in $windows) {
+        if ($nowMin -ge $w.StartMin -and $nowMin -lt $w.EndMin) { $inPeak = $true; $inWindow = $w; break }
+    }
+
+    # 2) 找下一个时段切换点（单位：分钟，相对今天 0 点；>1440 表示明天）
+    $nextMin = $null
+    $nextIsPeak = $false
+    if ($inPeak) {
+        $nextMin = $inWindow.EndMin          # 当前高峰窗口结束
+        $nextIsPeak = $false
+    } else {
+        foreach ($w in ($windows | Sort-Object { $_.StartMin })) {
+            if ($w.StartMin -gt $nowMin) { $nextMin = $w.StartMin; $nextIsPeak = $true; break }
+        }
+        if ($null -eq $nextMin) {            # 今天的高峰都过了 → 明天第一个高峰
+            $first = $windows | Sort-Object { $_.StartMin } | Select-Object -First 1
+            $nextMin = $first.StartMin + 1440
+            $nextIsPeak = $true
+        }
+    }
+    $nextChange = $beijing.Date.AddMinutes($nextMin)
+    $diff = [int]($nextChange - $beijing).TotalMinutes
+    $hh = [Math]::Floor($diff / 60)
+    $mm = $diff % 60
+    $nextChangeText = '距下一次时段切换还有 '
+    if ($hh -gt 0) { $nextChangeText += "$hh 小时 " }
+    $nextChangeText += "$mm 分钟"
+    $nextChangeText += "（$($nextChange.ToString('HH:mm')) 进入" + $(if ($nextIsPeak) { '高峰' } else { '空闲' }) + '）'
+
+    # 3) 今日安排（一句话）：各高峰段 + 其余空闲
+    $sorted = $windows | Sort-Object { $_.StartMin }
+    $peakTexts = @()
+    foreach ($w in $sorted) { $peakTexts += $w.Spec + ' 高峰' }
+    $todayScheduleText = '今日安排：' + ($peakTexts -join ' · ') + '（其余空闲）'
+
+    # 4) 参考价（V4 Pro，每百万 tokens，以官方为准）
+    $priceText = 'V4 Pro 参考价：高峰 输入 ¥9 / 输出 ¥27 ｜ 空闲 输入 ¥4.5 / 输出 ¥13.5（以官方为准）'
+
+    $statusText = if ($inPeak) { '🔴 高峰时段（价格更高）' } else { '🟢 空闲时段（半价）' }
+
+    return @{
+        Period            = if ($inPeak) { 'peak' } else { 'idle' }
+        StatusText        = $statusText
+        BeijingNow        = $beijing
+        NextChangeText    = $nextChangeText
+        TodayScheduleText = $todayScheduleText
+        PriceText         = $priceText
     }
 }
 

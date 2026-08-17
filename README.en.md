@@ -16,6 +16,7 @@ A **Cordis plugin + desktop component** for [DeepSeek Harness](https://github.co
   - Full version: `git clone` + `pnpm install` + `pnpm run build` + `pnpm dsh web`;
   - Official Web version: `npx @deepseek-ai/dsh web` (Node.js only).
 - **Not-installed guidance**: When DSH is not installed, the status card and start/open buttons clearly prompt and guide you to the Install page — no more silent failures.
+- **Billing-period card**: The console Overview page shows DeepSeek's peak/off-peak billing status in real time (Beijing time peak hours 09:00-12:00 & 14:00-18:00; peak prices are about 2x off-peak), so you can save money by scheduling calls off-peak. The card can collapse into a **draggable floating icon**, with an optional "remind me before peak hours" notification.
 
 ## Installation
 
@@ -82,6 +83,10 @@ The handler returns `{ kind: 'success' | 'error', text }`; the config is re-read
 | `checkTimeoutMs` | Network query timeout | `8000` |
 | `trayAutoStart` | Auto-start tray when DSH starts | `true` |
 | `theme` | Console theme | `dark` |
+| `peakReminder` | Remind before peak hours start | `false` |
+| `peakReminderMin` | Lead minutes for the reminder | `15` |
+
+> You can also override the official peak windows via `peakWindows` (e.g. `"09:00-12:00,14:00-18:00"`, Beijing time).
 
 User data (**do not delete**): `orca-dsh-launcher.json` (config), `orca-stats.json` (usage stats, atomic writes), `orca-dsh-server.log` (server log, auto-rotated above 2MB), `update-check-state.json` (update check results).
 

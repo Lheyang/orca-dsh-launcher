@@ -16,6 +16,7 @@
   - 完整版：`git clone` + `pnpm install` + `pnpm run build` + `pnpm dsh web`；
   - 官方 Web 版：`npx @deepseek-ai/dsh web`（只需 Node.js）。
 - **未安装引导**：未安装 DSH 时，状态卡片与启动/打开按钮明确提示，并引导至安装页，不再静默失败。
+- **计费时段卡片**：控制台概览页实时提示 DeepSeek 峰谷计费状态（北京时间高峰 09:00-12:00、14:00-18:00，高峰价约为空闲时段的 2 倍），帮您错峰省钱；卡片可收纳成**可拖动的小图标**，并支持「高峰开始前提醒」。
 
 ## 安装
 
@@ -82,6 +83,10 @@ handler 返回 `{ kind: 'success' | 'error', text }`，每次执行重新读取�
 | `checkTimeoutMs` | 网络查询超时 | `8000` |
 | `trayAutoStart` | DSH 启动时自动拉起托盘 | `true` |
 | `theme` | 控制台主题 | `dark` |
+| `peakReminder` | 高峰开始前提醒开关 | `false` |
+| `peakReminderMin` | 提前提醒分钟数 | `15` |
+
+> 高峰时段可自定义：配置里加 `peakWindows`（如 `"09:00-12:00,14:00-18:00"`，北京时间），即可覆盖官方默认时段。
 
 用户数据（**勿删**）：`orca-dsh-launcher.json`（配置）、`orca-stats.json`（使用统计，原子写入）、`orca-dsh-server.log`（服务器日志，>2MB 自动轮转）、`update-check-state.json`（更新检查结果）。
 
