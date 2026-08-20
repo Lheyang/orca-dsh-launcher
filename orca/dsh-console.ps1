@@ -1224,12 +1224,17 @@ $btnStartServer.Add_Click({
         }
         if (Test-ServerRunning) {
             $lblStatus.Text = '服务器已经在运行中'
-        } elseif (Start-DshServer) {
-            $script:pendingStart = $true
-            $lblStatus.Text = '正在启动服务器…'
-            Update-StatusDisplay
         } else {
-            $lblStatus.Text = '启动失败：' + $script:orcaLastServerError
+            # 先刷新界面提示（DSH 源码刚更新时会先自动构建，可能需要 1-2 分钟）
+            $lblStatus.Text = '正在启动服务器…（如 DSH 刚更新会先自动构建，请稍候）'
+            [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background)
+            if (Start-DshServer) {
+                $script:pendingStart = $true
+                $lblStatus.Text = '正在启动服务器…'
+                Update-StatusDisplay
+            } else {
+                $lblStatus.Text = '启动失败：' + $script:orcaLastServerError
+            }
         }
     } catch {
         $lblStatus.Text = '操作出错：' + $_.Exception.Message
@@ -1263,7 +1268,8 @@ $btnRestartServer.Add_Click({
             return
         }
         if (-not (Test-ServerRunning)) {
-            $lblStatus.Text = '服务器未运行，直接启动…'
+            $lblStatus.Text = '服务器未运行，直接启动…（如 DSH 刚更新会先自动构建，请稍候）'
+            [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background)
             if (Start-DshServer) {
                 $script:pendingStart = $true
                 Update-StatusDisplay
@@ -1281,6 +1287,8 @@ $btnRestartServer.Add_Click({
             return
         }
         Start-Sleep -Seconds 2
+        $lblStatus.Text = '重启中：正在重新构建/启动服务器…'
+        [System.Windows.Threading.Dispatcher]::CurrentDispatcher.Invoke([Action]{}, [System.Windows.Threading.DispatcherPriority]::Background)
         if (Start-DshServer) {
             $script:pendingStart = $true
             $lblStatus.Text = '重启中：服务器正在启动…'

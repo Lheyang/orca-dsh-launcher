@@ -108,7 +108,100 @@ function Get-UpdateState {
 }
 
 # ============================================================
-# 二、DSH 服务器启停
+# 二、DSH 构建检查（源码 checkout 更新后必须先 build 才能启动）
+#  DSH 仓库是源码 checkout，git pull 后若没重新构建，会缺关键
+#  构建产物导致启动失败。启动与更新两条路径都先做构建检查。
+# ============================================================
+$script:OrcaBuildCacheFile = Join-Path $env:USERPROFILE '.dsh\orca-dsh-last-build.json'
+$script:OrcaBuildLogFile   = Join-Path $env:USERPROFILE '.dsh\orca-dsh-build.log'
+$script:OrcaBuildKeyArtifacts = @(
+    'packages\context\session-reference\lib\typert.host.js',
+    'packages\context\session-reference\lib\typert.remote-client.js',
+    'packages\client\ui-renderer\lib\client.js',
+    'packages\client\ui-brand-official\lib\client.js',
+    'packages\client\ui-attachment\lib\client.js',
+    'packages\client\ui-reference\lib\client.js'
+)
+
+# 读取本地 DSH 当前提交号（读不到返回 $null）
+function Get-DshHead([string]$DshDir) {
+    try {
+        $out = & git -C $DshDir rev-parse HEAD 2>$null
+        if ($LASTEXITCODE -eq 0 -and $out) { return $out.Trim() }
+    } catch {}
+    return $null
+}
+
+# 读取上次成功构建的提交号（缓存文件，读不到返回 $null）
+function Get-DshLastBuiltCommit {
+    try {
+        if (Test-Path $script:OrcaBuildCacheFile) {
+            $c = Get-Content $script:OrcaBuildCacheFile -Raw | ConvertFrom-Json
+            if ($c.commit) { return [string]$c.commit }
+        }
+    } catch {}
+    return $null
+}
+
+# 把本次成功构建的提交号写回缓存
+function Set-DshLastBuiltCommit([string]$Commit) {
+    try {
+        $obj = [ordered]@{ commit = $Commit; builtAt = (Get-Date).ToString('o') }
+        $dir = Split-Path -Parent $script:OrcaBuildCacheFile
+        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        [System.IO.File]::WriteAllText($script:OrcaBuildCacheFile, ($obj | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
+        return $true
+    } catch { return $false }
+}
+
+# 6 个关键构建产物是否齐全
+function Test-DshBuildArtifacts([string]$DshDir) {
+    foreach ($a in $script:OrcaBuildKeyArtifacts) {
+        if (-not (Test-Path (Join-Path $DshDir $a))) { return $false }
+    }
+    return $true
+}
+
+# 执行构建（pnpm.cmd run build，隐藏窗口，10 分钟超时，输出进构建日志）
+# 注意：必须用 pnpm.cmd（本机 PowerShell 禁用了 pnpm.ps1）。返回 @{ ok; error }
+function Invoke-DshBuild([string]$DshDir) {
+    try {
+        $cmd = "pnpm.cmd run build >> `"$script:OrcaBuildLogFile`" 2>&1"
+        $proc = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', $cmd -WorkingDirectory $DshDir -WindowStyle Hidden -PassThru
+        if (-not $proc.WaitForExit(600000)) {
+            try { $proc.Kill() } catch {}
+            return @{ ok = $false; error = 'DSH 构建超时（超过 10 分钟），已取消' }
+        }
+        if ($proc.ExitCode -ne 0) {
+            return @{ ok = $false; error = 'DSH 构建失败，详情见 ' + $script:OrcaBuildLogFile }
+        }
+        return @{ ok = $true; error = $null }
+    } catch {
+        return @{ ok = $false; error = '构建执行出错：' + $_.Exception.Message }
+    }
+}
+
+# 构建检查 + 必要时构建（启动/更新共用）。
+# HEAD 变化 或 关键产物缺失 → 先构建；成功才放行并写回缓存。
+# 返回 @{ ok; rebuilt; error }；ok=$false 时不要启动服务器。
+function Ensure-DshBuilt([string]$DshDir) {
+    $head = Get-DshHead $DshDir
+    if (-not $head) {
+        return @{ ok = $false; rebuilt = $false; error = '无法读取 DSH 提交号（目录不是 git 仓库？）' }
+    }
+    $last = Get-DshLastBuiltCommit
+    $need = (-not $last -or $last -ne $head) -or (-not (Test-DshBuildArtifacts $DshDir))
+    if (-not $need) {
+        return @{ ok = $true; rebuilt = $false; error = $null }
+    }
+    $r = Invoke-DshBuild $DshDir
+    if (-not $r.ok) { return @{ ok = $false; rebuilt = $false; error = $r.error } }
+    Set-DshLastBuiltCommit $head
+    return @{ ok = $true; rebuilt = $true; error = $null }
+}
+
+# ============================================================
+# 三、DSH 服务器启停
 # ============================================================
 
 # 服务器是否在运行（看端口有没有监听）
@@ -182,6 +275,12 @@ function Start-DshServer {
     # 未安装 DSH（目录不存在或没有 package.json）→ 明确提示，别静默失败
     if (-not (Test-Path (Join-Path $script:orcaCfgDshDir 'package.json'))) {
         $script:orcaLastServerError = "未安装 DSH（找不到 $($script:orcaCfgDshDir)）。请到控制台「安装」页一键安装，或直接启动官方 Web 版。"
+        return $false
+    }
+    # 构建检查：源码 checkout 更新（HEAD 变化）或缺构建产物时先构建，成功才启动
+    $build = Ensure-DshBuilt $script:orcaCfgDshDir
+    if (-not $build.ok) {
+        $script:orcaLastServerError = $build.error
         return $false
     }
     try {
@@ -289,6 +388,17 @@ function Update-Dsh {
     try {
         $out = & git -C $script:orcaCfgDshDir pull 2>&1
         $code = $LASTEXITCODE
+        if ($code -eq 0) {
+            # 拉取成功：立即重新构建（HEAD 已变，缺构建产物会导致下次启动失败）
+            $build = Ensure-DshBuilt $script:orcaCfgDshDir
+            $pullText = ($out | Out-String).Trim()
+            if (-not $build.ok) {
+                return [pscustomobject]@{ ok = $false; output = $pullText + "`n`n[构建] " + $build.error }
+            }
+            if ($build.rebuilt) {
+                return [pscustomobject]@{ ok = $true; output = $pullText + "`n`n[构建] DSH 已重新构建完成（pnpm run build）" }
+            }
+        }
         return [pscustomobject]@{ ok = ($code -eq 0); output = (($out | Out-String).Trim()) }
     } catch {
         return [pscustomobject]@{ ok = $false; output = $_.Exception.Message }

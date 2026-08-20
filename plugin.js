@@ -288,11 +288,96 @@ async function getCommandVersion(command) {
   }
 }
 
+/* ------------------------------------------------------------
+ * DSH 构建检查（源码 checkout 更新后必须先 build 才能启动）
+ *  与 orca-common.ps1 的 Ensure-DshBuilt 逻辑保持一致。
+ * ---------------------------------------------------------- */
+const DSH_BUILD_ARTIFACTS = [
+  'packages/context/session-reference/lib/typert.host.js',
+  'packages/context/session-reference/lib/typert.remote-client.js',
+  'packages/client/ui-renderer/lib/client.js',
+  'packages/client/ui-brand-official/lib/client.js',
+  'packages/client/ui-attachment/lib/client.js',
+  'packages/client/ui-reference/lib/client.js',
+]
+const BUILD_CACHE_FILE = join(homedir(), '.dsh', 'orca-dsh-last-build.json')
+const BUILD_LOG_FILE = join(homedir(), '.dsh', 'orca-dsh-build.log')
+
+/** 读取本地 DSH 提交号（读不到返回 null） */
+async function getDshHead(dir) {
+  try {
+    const { stdout } = await execFileAsync('git', ['-C', dir, 'rev-parse', 'HEAD'], {
+      timeout: 10000,
+      windowsHide: true,
+    })
+    return stdout.trim() || null
+  } catch {
+    return null
+  }
+}
+
+function readBuildCache() {
+  try { return JSON.parse(readFileSync(BUILD_CACHE_FILE, 'utf8')) } catch { return null }
+}
+
+function writeBuildCache(commit) {
+  try {
+    mkdirSync(join(homedir(), '.dsh'), { recursive: true })
+    writeFileSync(BUILD_CACHE_FILE, JSON.stringify({ commit, builtAt: new Date().toISOString() }, null, 2), 'utf8')
+  } catch { /* 写不了就算了，下次会重新构建 */ }
+}
+
+function buildArtifactsPresent(dir) {
+  return DSH_BUILD_ARTIFACTS.every((a) => existsSync(join(dir, a)))
+}
+
+/** 执行构建（pnpm.cmd run build，10 分钟超时，输出进构建日志） */
+function runDshBuild(dir) {
+  return new Promise((resolve) => {
+    let child
+    try {
+      const cmd = 'pnpm.cmd run build >> "' + BUILD_LOG_FILE + '" 2>&1'
+      child = spawn('cmd.exe', ['/c', cmd], {
+        cwd: dir,
+        windowsHide: true,
+        detached: true,
+        stdio: 'ignore',
+      })
+    } catch {
+      return resolve(false)
+    }
+    const timer = setTimeout(() => {
+      try { child.kill() } catch {}
+      resolve(false)
+    }, 10 * 60 * 1000)
+    child.once('exit', (code) => { clearTimeout(timer); resolve(code === 0) })
+    child.once('error', () => { clearTimeout(timer); resolve(false) })
+  })
+}
+
+/** 构建检查 + 必要时构建；返回 { ok, rebuilt, error } */
+async function ensureDshBuilt(cfg) {
+  const head = await getDshHead(cfg.dshDir)
+  if (!head) return { ok: false, rebuilt: false, error: '无法读取 DSH 提交号（目录不是 git 仓库？）' }
+  const cache = readBuildCache()
+  const need = !cache || cache.commit !== head || !buildArtifactsPresent(cfg.dshDir)
+  if (!need) return { ok: true, rebuilt: false, error: null }
+  const built = await runDshBuild(cfg.dshDir)
+  if (!built) return { ok: false, rebuilt: false, error: 'DSH 构建失败或超时，详情见 ' + BUILD_LOG_FILE }
+  writeBuildCache(head)
+  return { ok: true, rebuilt: true, error: null }
+}
+
 /** 启动 DSH 服务器（隐藏窗口运行 pnpm dsh web，和托盘行为一致）
+ *  先做构建检查：源码更新或缺构建产物时先构建，成功才启动。
  *  返回 { ok, error }，让调用方能告诉用户具体失败原因 */
-function startServer(cfg) {
+async function startServer(cfg) {
   if (!existsSync(cfg.dshDir) || !existsSync(join(cfg.dshDir, 'package.json'))) {
     return { ok: false, error: '电脑上未安装 DSH（' + cfg.dshDir + ' 不存在）。请打开 Orca 控制台「安装」页一键安装，或直接启动官方 Web 版：npx @deepseek-ai/dsh web' }
+  }
+  const build = await ensureDshBuilt(cfg)
+  if (!build.ok) {
+    return { ok: false, error: build.error }
   }
   try {
     const child = spawn('cmd.exe', ['/c', 'pnpm dsh web'], {
@@ -482,7 +567,7 @@ async function orcaHandler(invocation, ctx) {
       if (owner) {
         return { kind: 'error', text: '端口 ' + cfg.port + ' 被 ' + (owner.name || ('PID ' + owner.pid)) + ' 占用，不能启动 DSH。请先关闭占用程序或修改端口。' }
       }
-      const result = startServer(cfg)
+      const result = await startServer(cfg)
       return result.ok
         ? { kind: 'success', text: '已启动 DSH 服务器（后台运行），稍后可在浏览器打开 http://127.0.0.1:' + cfg.port }
         : { kind: 'error', text: '启动 DSH 服务器失败：' + (result.error || '未知原因') }
@@ -516,7 +601,7 @@ async function orcaHandler(invocation, ctx) {
         // 等端口释放，避免立刻启动冲突
         await new Promise((r) => setTimeout(r, 1200))
       }
-      const result = startServer(cfg)
+      const result = await startServer(cfg)
       return result.ok
         ? { kind: 'success', text: '已重启 DSH 服务器（后台运行），稍后可在浏览器打开 http://127.0.0.1:' + cfg.port }
         : { kind: 'error', text: '重启失败：' + (result.error || '未知原因') }
@@ -529,11 +614,12 @@ async function orcaHandler(invocation, ctx) {
         return { kind: 'error', text: '端口 ' + cfg.port + ' 被 ' + (owner.name || ('PID ' + owner.pid)) + ' 占用，不能打开 DSH 界面。' }
       }
       if (!owner) {
-        const result = startServer(cfg)
+        const result = await startServer(cfg)
         if (!result.ok) {
           return { kind: 'error', text: '启动 DSH 服务器失败：' + (result.error || '未知原因') }
         }
-        if (!(await waitServerRunning(cfg, 60000))) {
+        // 构建可能需要 1-2 分钟，等待时间放宽到 3 分钟
+        if (!(await waitServerRunning(cfg, 180000))) {
           return { kind: 'error', text: 'DSH 服务器启动超时，请到控制台查看日志。' }
         }
       }
