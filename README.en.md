@@ -2,7 +2,7 @@
 
 🌏 **English** | [中文](README.md)
 
-![Version](https://img.shields.io/badge/version-v1.6.0-36D199) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-v1.7.0-36D199) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![License](https://img.shields.io/badge/license-MIT-green)
 
 A **Cordis plugin + desktop component** for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that provides update checking, server start/stop, system tray, a graphical console, and one-click installation.
 

@@ -2,7 +2,7 @@
 
 🌏 **中文** | [English](README.en.md)
 
-![版本](https://img.shields.io/badge/版本-v1.6.0-36D199) ![平台](https://img.shields.io/badge/平台-Windows-0078D6) ![许可证](https://img.shields.io/badge/许可证-MIT-green)
+![版本](https://img.shields.io/badge/版本-v1.7.0-36D199) ![平台](https://img.shields.io/badge/平台-Windows-0078D6) ![许可证](https://img.shields.io/badge/许可证-MIT-green)
 
 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) 提供更新检查、服务器启停、系统托盘、图形控制台与一键安装引导的 **Cordis 插件 + 桌面端组件**。
 
