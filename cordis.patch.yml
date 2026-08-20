@@ -1,0 +1,5 @@
+# Orca DSH Launcher —— bundle 配置层（dsh plugin add 安装用）
+# 与 install.ps1 生成的登记块格式一致：insert 一行插件行，按包名解析。
+- insert:
+    - id: orca-dsh-launcher
+      name: 'orca-dsh-launcher'
