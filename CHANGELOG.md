@@ -5,7 +5,8 @@
 
 ## [Unreleased]
 
-- 暂无计划中的变更。
+### Fixed
+- **`/orca 重启`（及安装/启动流程）在带空格的 DSH 目录上失败**：`ProcessRunner.StartHiddenCmd` 原先用 `ArgumentList` 传命令字符串，.NET 会按 C 运行时规则把命令里的 `"` 转义成 `\"`，而 `cmd.exe` 不认 `\"` 转义，导致 `cd /d "D:\deepseek harness"` 被拆成 `cd /d D:\deepseek`、cd 静默失败、服务器在错误目录无法启动。改为用 `Arguments` 单字符串原样传给 `cmd.exe`（与旧版 PowerShell 的拼接行为一致），`Run` 方法对 `cmd.exe` 同样特判。已实测 `/orca 重启` 完整链路：关旧 → 等端口释放 → 正确目录拉起新服务器 → 端口恢复。
 
 ## [v2.0.0] - 2026-08-21
 

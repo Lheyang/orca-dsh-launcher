@@ -40,6 +40,13 @@ public static class ProcessRunner
     /// <summary>
     /// 用 cmd.exe 后台跑一条命令（隐藏窗口），返回进程对象供轮询 HasExited。
     /// 命令里可以自带 &gt;&gt; 重定向，与原 PowerShell 版行为一致。
+    ///
+    /// 注意：这里**必须**用 Arguments 单字符串，不能走 ArgumentList。
+    /// ArgumentList 会按 C 运行时规则把参数里的 " 转义成 \"，而 cmd.exe 不认
+    /// \" 转义（它把反斜杠当普通字符、把 " 当引号开关），于是带空格的路径
+    /// （如 "D:\deepseek harness"）会被拆断，重启/安装时 cd 进错误目录、命令
+    /// 静默失败。Arguments 不做任何转义、原样传给 cmd.exe，由 cmd 按自己的
+    /// 规则解析——与旧版 PowerShell Start-Process 的拼接行为一致。
     /// </summary>
     public static Process? StartHiddenCmd(string command, string? workingDirectory = null)
     {
@@ -51,9 +58,8 @@ public static class ProcessRunner
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden,
+                Arguments = "/c " + command,
             };
-            psi.ArgumentList.Add("/c");
-            psi.ArgumentList.Add(command);
             if (!string.IsNullOrWhiteSpace(workingDirectory) && Directory.Exists(workingDirectory))
             {
                 psi.WorkingDirectory = workingDirectory;
@@ -92,7 +98,17 @@ public static class ProcessRunner
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
-        foreach (var a in arguments) psi.ArgumentList.Add(a);
+        // 传参方式：普通程序按 C 运行时规则转义（git 等用 msvcrt 解析，ArgumentList
+        // 的 \" 转义是正确的）；唯独 cmd.exe 用自己的引号规则，\” 转义会把带空格的
+        // 路径拆坏，所以 cmd.exe 一律改用 Arguments 单字符串原样拼接。
+        if (fileName.Equals("cmd.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            psi.Arguments = string.Join(" ", arguments);
+        }
+        else
+        {
+            foreach (var a in arguments) psi.ArgumentList.Add(a);
+        }
         if (!string.IsNullOrWhiteSpace(workingDirectory) && Directory.Exists(workingDirectory))
         {
             psi.WorkingDirectory = workingDirectory;
