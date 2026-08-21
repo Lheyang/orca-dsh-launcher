@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ============================================================
+       Orca.App —— 桌面端主程序 orca.exe
+       ============================================================
+       一个 exe 带多种模式（用命令行参数选择），彻底取代
+       dsh-tray.ps1 / dsh-console.ps1 / orca-setup.ps1 / start-*.vbs：
+
+         orca.exe 加参数 console        打开图形控制台（默认模式，桌面图标用）
+         orca.exe 加参数 tray           常驻系统托盘（开机自启用）
+         orca.exe 加参数 setup          一键安装向导（orca-setup.exe 默认走这个）
+         orca.exe 加参数 start-server   静默启动 DSH 服务器后退出（开机自启用）
+         （参数前缀可写两个减号，例如 console 对应 tray 同理）
+
+       WinExe 类型 = 没有黑框窗口，所以不再需要 wscript + .vbs 包一层。
+       ============================================================ -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Orca.App</RootNamespace>
+    <AssemblyName>orca</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\dsh-tray.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- 高 DPI：按显示器缩放感知，界面在高分屏 / 多屏不同缩放下都清晰 -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <!-- 全局 using 精简（同 Orca.Core：避免 Path/Color/Point 之类同名类型打架） -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orca.Core\Orca.Core.csproj" />
+  </ItemGroup>
+
+  <!-- 图标资源：拷到输出根目录，托盘 / 窗口 / 快捷方式都从这里取 -->
+  <ItemGroup>
+    <None Include="Assets\dsh-tray.ico" Link="dsh-tray.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Assets\orca-icon.ico" Link="orca-icon.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- 安装包内嵌插件负载（publish.cmd 打 orca-setup.exe 时传 -p:OrcaPayload=…zip；
+       普通构建不带，安装向导会退回读程序旁边的文件） -->
+  <ItemGroup Condition="'$(OrcaPayload)' != ''">
+    <EmbeddedResource Include="$(OrcaPayload)" LogicalName="Orca.Payload.zip" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ============================================================
+       Orca.Cli —— 命令行工具 orca-cli.exe
+       ============================================================
+       DSH 插件（plugin.js）调用它来实现 /orca 的 14 个子命令：
+         orca-cli.exe run status （加 json 开关可输出结构化结果）
+       构建 / 安装脚本也用它（install-plugin、uninstall-plugin、
+       quick-check、selftest），从此不再需要 PowerShell 脚本。
+       ============================================================ -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Orca.Cli</RootNamespace>
+    <AssemblyName>orca-cli</AssemblyName>
+    <!-- 引用 Orca.Core（内含 WPF 对话框），所以这里也要开 WPF/WinForms 开关 -->
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orca.Core\Orca.Core.csproj" />
+  </ItemGroup>
+
+</Project>

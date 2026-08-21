@@ -1,0 +1,7 @@
+<Application x:Class="Orca.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- 启动逻辑全部在 App.xaml.cs 的 OnStartup 里按模式分发，
+       所以这里不设 StartupUri。 -->
+  <Application.Resources/>
+</Application>

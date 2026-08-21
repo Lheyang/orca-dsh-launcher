@@ -1,32 +1,43 @@
 # Orca DSH Launcher
 
-> A Windows desktop companion and Cordis plugin for DeepSeek Harness (DSH): update checking, server start/stop, system tray, WPF graphical console, and a one-click installation wizard.
+> A Windows desktop companion and Cordis plugin for DeepSeek Harness (DSH): update checking, server start/stop, system tray, WPF graphical console, and a one-click installation wizard. Written in C# / .NET 8.
 
 Orca DSH Launcher is an open-source plugin and desktop toolset for DeepSeek Harness (also known as DSH or deepseek-harness), the open-source AI agent harness by DeepSeek. It helps DSH users manage their local DSH installation on Windows: it checks for official updates, controls the DSH web server, adds a system tray icon and a graphical management console, and can install DSH on a brand-new computer with one click.
+
+Since v2.0.0 the whole desktop side is native C# / .NET 8 (WPF + WinForms) compiled to real executables; PowerShell and VBScript are gone (the v1.x scripts are kept under `legacy/` for reference only).
 
 ## What it does
 
 - Checks for DSH updates on every startup (query only - never auto-updates, never modifies DSH source)
-- `/orca` slash command set: status, check, start, stop, restart, open, log, port, config, health/diagnose, console, tray
-- System tray icon (WinForms NotifyIcon): left-click opens the UI, right-click menu starts/stops the server and checks updates
-- WPF graphical console (Overview / Server / Install / Logs / Settings / About) with dark/light themes
-- One-click installation wizard (orca-setup.exe) for installing DSH on a fresh machine: environment check, network check, git clone, pnpm install + build, plugin install
-- Port ownership detection so it never kills unrelated Node processes
+- `/orca` slash command set: status, check, start, stop, restart, open, log, port, config, health/diagnose, console, tray, tray-stop, setup, help
+- System tray icon (WinForms NotifyIcon): left-click opens the UI, right-click menu starts/stops the server, opens the console and checks updates
+- WPF graphical console (Overview / Server / Install / Logs / Settings / About) with dark/light themes and 6 accent colors
+- One-click installation wizard (`orca-setup.exe`, self-contained single file) for installing DSH on a fresh machine: environment check, network check, git clone, pnpm install + build, plugin install
+- Automatic DSH rebuild guard: after `git pull`, a missing build artifact would break startup, so both "start" and "update" paths run a build check first
+- Port ownership detection (IP Helper API + reading the target process PEB) so it never kills unrelated Node processes
 - Daily automatic update checks (notification only)
+- DeepSeek peak/off-peak billing badge injected into the DSH chat header (browser-side, Beijing time)
 
 ## Technologies
 
-- Node.js / Cordis plugin (object plugin form, inject: ['commands'])
-- PowerShell 5.1 (WPF console UI, WinForms tray, install and setup scripts)
-- Windows platform only
+- C# 12 / .NET 8 (`net8.0-windows`), WPF for windows and dialogs, WinForms for the tray icon
+- Node.js / Cordis plugin entry (`plugin.js`, object plugin form, `inject: ['commands']`) that forwards subcommands to `orca-cli.exe`
+- MSBuild packaging (`src/Orca.Package.proj`): plugin package -> payload zip -> self-contained single-file installer
+- Windows 10/11 only
 - git, pnpm, npx @deepseek-ai/dsh
+
+## Components
+
+- `orca.exe` - one executable, four modes: `--console`, `--tray`, `--setup`, `--start-server`
+- `orca-cli.exe` - every `/orca` subcommand, plus `install-plugin`, `uninstall-plugin`, `quick-check`, `selftest`
+- `Orca.Core.dll` - all shared logic (config, stats, ports, server control, build check, update check, shortcuts, installer, theming)
 
 ## Installation
 
-Existing DSH users:
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+Fresh machine: download `orca-setup.exe` from the Releases page and double-click it (no .NET or Node.js required to run the installer itself).
 
-Fresh machine: download orca-setup.exe from the Releases page and double-click it.
+Existing DSH users, from source (needs .NET 8 SDK):
+install.cmd
 
 DSH official Web version (no plugin needed):
 npx @deepseek-ai/dsh web

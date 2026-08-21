@@ -7,6 +7,43 @@
 
 - 暂无计划中的变更。
 
+## [v2.0.0] - 2026-08-21
+
+> **底层技术栈重写**：桌面端从 PowerShell 5.1 + VBScript 全面迁移到 **C# / .NET 8（WPF + WinForms）**，编译为原生 exe。**功能一个不少**，行为逐项对齐 v1.7.0。
+
+### Changed
+- **技术栈**：`orca-common.ps1` / `orca-install.ps1` / `dsh-tray.ps1` / `dsh-console.ps1` / `orca-setup.ps1` / `start-*.vbs` 共约 4400 行 PowerShell 全部重写为 C# 解决方案 `src/`：
+  - `Orca.Core`（公共逻辑库）：配置读写、使用统计、日志轮转、端口归属判断、服务器启停、DSH 构建检查、更新检查、快捷方式、`cordis.patch.yml` 登记、安装逻辑、主题与强调色、自定义对话框。
+  - `Orca.App`（`orca.exe`，一个程序四种模式）：`--console` 图形控制台（WPF，6 页）、`--tray` 系统托盘（WinForms NotifyIcon）、`--setup` 一键安装向导（WPF，6 步）、`--start-server` 静默启动服务器。
+  - `Orca.Cli`（`orca-cli.exe`）：`/orca` 全部子命令 + `install-plugin` / `uninstall-plugin` / `quick-check` / `selftest`。
+- **`plugin.js` 变成薄壳**（约 200 行）：只做「注册 `/orca` 命令 → 转发给 `orca-cli.exe` → 返回 `{kind,text}`」，另加启动时后台更新检查与按配置拉起托盘。插件侧不再调用 `powershell.exe` / `netstat` / `taskkill`，也不再维护第二套逻辑。
+- **不再需要 VBScript 启动器**：`orca.exe` 是 `WinExe`（无控制台窗口），快捷方式直接带参数，`start-tray.vbs` / `start-console.vbs` / `start-dsh-server.vbs` 全部退役。
+- **开发脚本改为 `.cmd` + MSBuild**：`build.cmd` / `test.cmd` / `install.cmd` / `uninstall.cmd` / `publish.cmd` 取代 `scripts/*.ps1`；打包由 `src/Orca.Package.proj`（MSBuild）完成，不再依赖 ps2exe。
+- **分发形态升级**：`dist\orca-setup.exe` 改为 **.NET 自包含单文件**（内嵌插件包 zip 作为嵌入资源），全新电脑无需预装 .NET 即可双击安装。
+- **备份位置统一**：安装/卸载/升级前的自动备份统一放 `~/.dsh/orca-backup/`（旧版放在仓库 `backup/`），从发布包安装时也一定可写。
+
+### Added
+- **`/orca 安装`（`setup`）子命令**：直接从聊天窗口打开一键安装向导。
+- **`orca-cli.exe selftest`**：9 项内建自检（版本号 / 配置往返 / 端口探测 / 统计原子写 / 图标资源 / 快捷方式创建删除 / 登记文件读写 / 日志 / 环境探测），`test.cmd` 一键跑完。
+- **`orca-cli.exe quick-check`**：输出状态 JSON（含版本、运行时、端口状态、安装状态、构建产物、更新检查结果），便于脚本与监控接入。
+- **状态里新增托盘信息**：`/orca 状态` 与「诊断」现在会显示托盘是否在运行、构建产物是否齐全、桌面端版本与 .NET 运行时版本。
+- **`NuGet.config`**：仓库级 NuGet 源声明，避免受机器全局配置影响（只有打自包含安装器时需要联网）。
+
+### Fixed
+- **状态刷新不再卡界面**：端口归属判断由 `Get-CimInstance Win32_Process`（每次 50~200ms）改为直接读目标进程 PEB（微秒级），并且检查更新 / 启停 / 安装等耗时操作全部移到后台线程。
+- **`/orca 关闭`、`/orca 重启` 更可靠**：`orca-cli.exe` 是 DSH 服务器的子进程，直接 `taskkill /T` 会把自己一起杀掉导致回复丢失；现在改为派发一条"脱钩"的后台命令串（等待 → 关闭 → 重新启动），命令回复稳定送达。
+- **快捷方式图标不再指向编译目录**：托盘/服务器自启快捷方式的图标改用目标 exe 旁边的 `dsh-tray.ico`。
+- **升级自动清理旧资产**：安装时若发现 v1.x 的 `orca\*.ps1`，先整目录备份到 `~/.dsh/orca-backup/legacy-powershell-*` 再删除，避免新旧两套并存。
+- **彻底摆脱脚本编码坑**：不再有「`.ps1` 必须 UTF-8 带 BOM」「PS 5.1 按 GBK 读 JSON 乱码」这类问题；配置文件读写统一走 `Utf8Files`（UTF-8 无 BOM）。
+
+### Compatibility
+- **配置与数据完全兼容**：`~/.dsh/orca-dsh-launcher.json`、`orca-stats.json`、`orca-dsh-server.log`、`update-check-state.json`、`orca-dsh-last-build.json` 沿用同名文件与字段，升级不丢数据；配置里用户手动添加的字段保存时原样保留。
+- **单实例与联动信号沿用 v1.x 名称**（`Local\DSH-Tray-Single`、`Local\Orca-Console-Show/Close`、`Local\Orca-Tray-Close`），新旧版本混装也不会开出两个托盘，并可互相优雅关闭。
+- **`legacy/`**：v1.7.0 的全部 PowerShell / VBS 实现原样保留，仅作历史参照。
+
+### Requirements
+- 编译需要 .NET 8 SDK；日常运行需要 .NET 8 Desktop Runtime（`orca-setup.exe` 自包含，无需另装）。
+
 ## [v1.7.0] - 2026-08-20
 
 ### Added

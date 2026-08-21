@@ -1,0 +1,43 @@
+<Project>
+
+  <!-- ============================================================
+       Orca DSH Launcher —— 解决方案公共编译属性
+       ============================================================
+       所有子项目（Orca.Core / Orca.App / Orca.Cli）共用这里的设置，
+       改一处全部生效。
+       - 目标框架：net8.0-windows（WPF + WinForms 都要 Windows 专用框架）
+       - 语言版本：C# 12（.NET 8 默认）
+       - 版本号：与 package.json 保持一致（AGENTS.md 规定 package.json
+         是唯一来源；build.cmd 会把 package.json 的版本传进来覆盖，
+         这里的值只是直接 dotnet build 时的兜底）
+       ============================================================ -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Platforms>AnyCPU</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+
+    <!-- 版本信息（显示在 exe 属性、关于页、托盘菜单） -->
+    <Version Condition="'$(Version)' == ''">2.0.0</Version>
+    <Company>Orca DSH Launcher</Company>
+    <Product>Orca DSH Launcher</Product>
+    <Copyright>MIT License</Copyright>
+    <NeutralLanguage>zh-Hans</NeutralLanguage>
+
+    <!-- 编译期严格一点，避免把警告带进正式版 -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningLevel>5</WarningLevel>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- 输出干净：不生成多余的附属文件 -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <ErrorReport>none</ErrorReport>
+  </PropertyGroup>
+
+</Project>

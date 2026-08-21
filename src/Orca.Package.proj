@@ -1,0 +1,85 @@
+<Project DefaultTargets="All">
+
+  <!-- ============================================================
+       Orca.Package.proj —— 打包脚本（MSBuild 原生，不依赖 PowerShell）
+       ============================================================
+       用法（仓库根目录）：
+         build.cmd      只编译
+         publish.cmd    编译 + 组装插件包 + 打出 dist\orca-setup.exe
+
+       产物：
+         dist\stage\                 可直接安装进 DSH 的插件包
+           plugin.js / package.json / cordis.patch.yml / lib\ / bin\
+         dist\orca-plugin-payload.zip  插件包压缩件（内嵌进安装器）
+         dist\orca-setup.exe           单文件安装器（自包含 .NET，全新电脑可直接跑）
+       ============================================================ -->
+
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)..\</RepoRoot>
+    <SrcDir>$(MSBuildThisFileDirectory)</SrcDir>
+    <DistDir>$(RepoRoot)dist\</DistDir>
+    <StageDir>$(DistDir)stage\</StageDir>
+    <StageBinDir>$(StageDir)bin\</StageBinDir>
+    <PayloadZip>$(DistDir)orca-plugin-payload.zip</PayloadZip>
+    <SetupPublishDir>$(DistDir)setup\</SetupPublishDir>
+    <SetupExe>$(DistDir)orca-setup.exe</SetupExe>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+  </PropertyGroup>
+
+  <!-- 随插件一起分发的文件（DSH 侧需要的 JS + 配置） -->
+  <ItemGroup>
+    <PluginFile Include="$(RepoRoot)plugin.js" />
+    <PluginFile Include="$(RepoRoot)package.json" />
+    <PluginFile Include="$(RepoRoot)cordis.patch.yml" />
+    <PluginFile Include="$(RepoRoot)LICENSE" />
+    <PluginLibFile Include="$(RepoRoot)lib\**\*" />
+  </ItemGroup>
+
+  <!-- ① 清理上次的暂存目录 -->
+  <Target Name="CleanStage">
+    <RemoveDir Directories="$(StageDir)" ContinueOnError="true" />
+    <MakeDir Directories="$(StageDir);$(StageBinDir);$(DistDir)" />
+  </Target>
+
+  <!-- ② 编译并发布两个 exe 到 stage\bin（框架依赖版，体积小） -->
+  <Target Name="PublishBinaries" DependsOnTargets="CleanStage">
+    <MSBuild Projects="$(SrcDir)Orca.App\Orca.App.csproj"
+             Targets="Restore;Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(StageBinDir);SelfContained=false;PublishSingleFile=false;RuntimeIdentifier=win-x64;PublishReadyToRun=false" />
+    <MSBuild Projects="$(SrcDir)Orca.Cli\Orca.Cli.csproj"
+             Targets="Restore;Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(StageBinDir);SelfContained=false;PublishSingleFile=false;RuntimeIdentifier=win-x64;PublishReadyToRun=false" />
+    <Message Importance="high" Text="[打包] 已发布 orca.exe / orca-cli.exe -> $(StageBinDir)" />
+  </Target>
+
+  <!-- ③ 把 JS 与配置文件放进暂存目录 -->
+  <Target Name="StagePlugin" DependsOnTargets="PublishBinaries">
+    <Copy SourceFiles="@(PluginFile)" DestinationFolder="$(StageDir)" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="@(PluginLibFile)" DestinationFiles="@(PluginLibFile->'$(StageDir)lib\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" />
+    <Message Importance="high" Text="[打包] 插件包已组装 -> $(StageDir)" />
+  </Target>
+
+  <!-- ④ 压成 payload（安装器内嵌用） -->
+  <Target Name="Payload" DependsOnTargets="StagePlugin">
+    <Delete Files="$(PayloadZip)" ContinueOnError="true" />
+    <ZipDirectory SourceDirectory="$(StageDir)" DestinationFile="$(PayloadZip)" Overwrite="true" />
+    <Message Importance="high" Text="[打包] payload 已生成 -> $(PayloadZip)" />
+  </Target>
+
+  <!-- ⑤ 打单文件安装器（自包含运行时，全新电脑无需装 .NET） -->
+  <Target Name="Setup" DependsOnTargets="Payload">
+    <RemoveDir Directories="$(SetupPublishDir)" ContinueOnError="true" />
+    <MSBuild Projects="$(SrcDir)Orca.App\Orca.App.csproj"
+             Targets="Restore;Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(SetupPublishDir);RuntimeIdentifier=win-x64;SelfContained=true;PublishSingleFile=true;EnableCompressionInSingleFile=true;IncludeNativeLibrariesForSelfExtract=true;PublishReadyToRun=false;OrcaPayload=$(PayloadZip)" />
+    <Delete Files="$(SetupExe)" ContinueOnError="true" />
+    <Copy SourceFiles="$(SetupPublishDir)orca.exe" DestinationFiles="$(SetupExe)" />
+    <Message Importance="high" Text="[打包] 安装器已生成 -> $(SetupExe)" />
+  </Target>
+
+  <Target Name="All" DependsOnTargets="Setup" />
+
+  <!-- 只组装插件包（install.cmd 用，不打安装器，省时间） -->
+  <Target Name="StageOnly" DependsOnTargets="StagePlugin" />
+
+</Project>

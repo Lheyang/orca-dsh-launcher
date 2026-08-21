@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ============================================================
+       Orca.Core —— 公共逻辑库（替代原 orca-common.ps1 + orca-install.ps1）
+       ============================================================
+       托盘、控制台、安装向导、命令行工具全部引用这一个库，
+       业务逻辑只写在这里一份（和原 PowerShell 版的职责边界一致）。
+       ============================================================ -->
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Orca.Core</RootNamespace>
+    <AssemblyName>Orca.Core</AssemblyName>
+    <!-- 需要 WPF 解码多尺寸 ico、弹自定义对话框；需要 WinForms 画托盘兜底图标 -->
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <!-- 全局 using 精简：WinForms/Drawing 的全局 using 会和 System.IO / WPF
+       的同名类型（Path、Color、Point…）打架，这里去掉它们、补上 System.IO，
+       各文件按需自己 using，避免歧义。 -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+</Project>
