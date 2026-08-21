@@ -19,3 +19,6 @@ node_modules/
 # Windows 系统文件
 Thumbs.db
 Desktop.ini
+
+# v1.x 的 PowerShell 实现已从仓库移除（本地磁盘与 git 历史仍可回退）
+legacy/

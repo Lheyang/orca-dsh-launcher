@@ -8,6 +8,9 @@
 ### Fixed
 - **`/orca 重启`（及安装/启动流程）在带空格的 DSH 目录上失败**：`ProcessRunner.StartHiddenCmd` 原先用 `ArgumentList` 传命令字符串，.NET 会按 C 运行时规则把命令里的 `"` 转义成 `\"`，而 `cmd.exe` 不认 `\"` 转义，导致 `cd /d "D:\deepseek harness"` 被拆成 `cd /d D:\deepseek`、cd 静默失败、服务器在错误目录无法启动。改为用 `Arguments` 单字符串原样传给 `cmd.exe`（与旧版 PowerShell 的拼接行为一致），`Run` 方法对 `cmd.exe` 同样特判。已实测 `/orca 重启` 完整链路：关旧 → 等端口释放 → 正确目录拉起新服务器 → 端口恢复。
 
+### Removed
+- **v1.x 的 PowerShell / VBScript 实现（`legacy/`）从仓库移除**：避免 GitHub 语言统计把 PowerShell 计入项目占比；旧文件保留在本地磁盘与 git 历史中，可随时回退（`git show`）。
+
 ## [v2.0.0] - 2026-08-21
 
 > **底层技术栈重写**：桌面端从 PowerShell 5.1 + VBScript 全面迁移到 **C# / .NET 8（WPF + WinForms）**，编译为原生 exe。**功能一个不少**，行为逐项对齐 v1.7.0。

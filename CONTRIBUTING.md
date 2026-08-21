@@ -9,7 +9,7 @@
 桌面伴侣 + Cordis 插件：更新检查、服务器启停、系统托盘、图形控制台、一键安装。
 
 **v2.0.0 起底层是 C# / .NET 8**（WPF 窗口 + WinForms 托盘），编译成原生 exe；
-v1.x 的 PowerShell / VBScript 实现保留在 `legacy/`，**只读参考，不再维护**。
+v1.x 的 PowerShell / VBScript 实现已从仓库移除（本地磁盘 `legacy/` 与 git 历史中仍可回退），**不要新增 .ps1**。
 
 唯一保留的 JavaScript 是 `plugin.js`（DSH 用 Node 在自己进程里加载插件，这是硬约束）
 和 `lib/client.js`（跑在浏览器里的聊天界面客户端插件）。

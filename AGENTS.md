@@ -5,7 +5,7 @@
 引导。插件经 `cordis.patch.yml` 挂载到 `dsh web`，**绝不修改 DSH 源码**。
 
 **v2.0.0 起底层全部为 C# / .NET 8（WPF + WinForms）**，不再使用 PowerShell 与
-VBScript。旧实现保留在 `legacy/` 仅供对照，**不要再改动它，也不要再新增 .ps1**。
+VBScript。旧实现已从仓库移除（本地磁盘与 git 历史中仍可找回），**不要新增 .ps1**。
 
 维护者必读 [CONTRIBUTING.md](CONTRIBUTING.md)（本文件是其浓缩版）；用户文档见
 [README.md](README.md)；变更记录见 [CHANGELOG.md](CHANGELOG.md)。
@@ -48,7 +48,6 @@ src/
     Win32Helper.cs         任务栏图标 / AppUserModelID
     Assets/*.ico           虎鲸图标
   Orca.Cli/              命令行 orca-cli.exe（plugin.js 与 .cmd 脚本都调它）
-legacy/                  v1.x 的 PowerShell / VBS 实现（只读参考，勿改）
 build.cmd / test.cmd / install.cmd / uninstall.cmd / publish.cmd
 scripts/_find-dotnet.cmd 找 SDK + 读版本号（被上面几个 .cmd 调用）
 ```
@@ -150,5 +149,5 @@ Conventional Commits：`type(scope): subject`。type 用 `feat` / `fix` / `refin
 - 项目版本（本仓库）与运行版本
   （`~/.dsh/profiles/web/node_modules/orca-dsh-launcher/`）可能不同步，改完必须
   `install.cmd` 同步，**不要直接改运行版本**。
-- `legacy/` 只是历史参照。需要了解某个行为的原始实现时可以读，但**不要修改、
-  不要复活**其中任何脚本。
+- v1.x 的 PowerShell 实现已从仓库移除（本地磁盘 `legacy/` 与 git 历史中仍可回退），
+  需要对照旧行为时用 `git show` 查看历史版本，**不要新增 .ps1**。

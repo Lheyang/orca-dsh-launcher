@@ -136,7 +136,6 @@ src/
 │                        --start-server 静默启动服务器（开机自启）
 ├── Orca.Cli/            orca-cli.exe —— /orca 全部子命令 + 安装/卸载/自检
 └── Orca.Package.proj    打包：组装插件包 → payload.zip → 单文件 orca-setup.exe
-legacy/                  v1.x 的 PowerShell / VBS 实现（只读参考）
 build.cmd test.cmd install.cmd uninstall.cmd publish.cmd
 ```
 

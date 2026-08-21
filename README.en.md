@@ -116,7 +116,6 @@ src/
 │                        --start-server (silent server start)
 ├── Orca.Cli/            orca-cli.exe — all /orca subcommands + install/uninstall/selftest
 └── Orca.Package.proj    packaging: plugin package → payload.zip → single-file orca-setup.exe
-legacy/                  v1.x PowerShell / VBS implementation (read-only reference)
 build.cmd test.cmd install.cmd uninstall.cmd publish.cmd
 ```
 
