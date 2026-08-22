@@ -2,11 +2,11 @@
 
 🌏 **English** | [中文](README.md)
 
-![Version](https://img.shields.io/badge/version-v2.0.0-36D199) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![Stack](https://img.shields.io/badge/C%23-.NET%208%20WPF-512BD4) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-v2.1.0-36D199) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![Stack](https://img.shields.io/badge/C%23-.NET%208%20WPF-512BD4) ![License](https://img.shields.io/badge/license-MIT-green)
 
 A **Cordis plugin + native desktop app** for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) that provides update checking, server start/stop, a system tray icon, a graphical console, and one-click installation.
 
-> **v2.0.0 — major rewrite**: the whole desktop side moved from PowerShell / VBScript to **C# / .NET 8 (WPF + WinForms)**, compiled to native executables. Every feature is preserved; startup is faster, the UI never freezes while polling status, and there are no more PowerShell execution-policy or script-encoding (BOM/GBK) pitfalls.
+> **Implementation**: since v2.0.0 the desktop side is native executables built with **C# / .NET 8 (WPF + WinForms)**, instead of PowerShell / VBScript. Startup and status polling are faster, and it is no longer affected by PowerShell execution-policy or script-encoding (BOM/GBK) differences.
 
 ## Features
 

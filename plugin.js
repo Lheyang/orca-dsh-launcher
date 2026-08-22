@@ -202,7 +202,7 @@ function apply(ctx) {
   ctx.commands.register({
     name: 'orca',
     description: 'Orca DSH Launcher：查看状态 / 检查更新 / 启停服务器 / 日志端口 / 打开界面 / 控制托盘',
-    input: { hint: '状态 | 检查 | 启动 | 关闭 | 重启 | 打开 | 日志 | 端口 | 配置 | 诊断 | 控制台 | 托盘 | 帮助' },
+    input: { hint: '状态 | 检查 | 更新 | 启动 | 关闭 | 重启 | 打开 | 日志 | 端口 | 配置 | 诊断 | 控制台 | 托盘 | 帮助' },
     handler: (invocation) => orcaHandler(invocation),
   })
 

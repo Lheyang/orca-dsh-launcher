@@ -1,7 +1,7 @@
 {
   "name": "orca-dsh-launcher",
   "description": "Orca DSH Launcher：DSH 全能插件 —— 启动更新检查 + 服务器启停 + Orca 托盘 + 桌面控制台（C# / .NET 8 原生桌面端）。",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "main": "plugin.js",
   "files": [

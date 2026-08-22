@@ -97,9 +97,12 @@ public static class Program
                 return CmdStatus(cfg);
 
             case "check":
-            case "update":
             case "检查":
                 return CmdCheck(cfg);
+
+            case "update":
+            case "更新":
+                return CmdUpdate(cfg);
 
             case "start":
             case "启动":
@@ -231,6 +234,43 @@ public static class Program
                 + "（提示：是否更新、怎么更新，请咨询懂技术的人，本插件不自动更新）");
         }
         return Emit(true, $"✅ 当前已是最新版本（{r.LocalShort}），检查时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+    }
+
+    private static int CmdUpdate(OrcaConfig cfg)
+    {
+        // 先用预览让用户看清"更新会带来什么"（与控制台「更新 DSH…」一致）
+        var preview = DshServer.PreviewUpdate(cfg);
+        if (preview.Ok && preview.IncomingCount == 0)
+        {
+            return Emit(true, "当前 DSH 已是最新版本，无需更新。");
+        }
+
+        var msg = new List<string>();
+        if (preview.Ok && preview.IncomingCount > 0)
+        {
+            msg.Add($"本次将拉取 {preview.IncomingCount} 个新提交：");
+            foreach (var c in preview.Commits ?? Array.Empty<string>()) msg.Add("  · " + c);
+            if (preview.IncomingCount > (preview.Commits?.Length ?? 0))
+            {
+                msg.Add($"  …（共 {preview.IncomingCount} 个）");
+            }
+        }
+        else if (!preview.Ok)
+        {
+            msg.Add("（无法获取更新预览：" + preview.Error + "，继续更新）");
+        }
+        msg.Add(string.Empty);
+
+        // 显式用户命令（非后台自动），与铁律"绝不自动更新"不冲突
+        var r = DshServer.UpdateDsh(cfg);
+        if (!r.Ok)
+        {
+            return Emit(false, string.Join("\n", msg) + "更新失败：" + (r.Error ?? "git pull 出错") + "（当前版本不受影响）");
+        }
+
+        var okMsg = string.Join("\n", msg) + "✅ 更新完成！请重启 DSH 生效。";
+        if (!string.IsNullOrWhiteSpace(r.Output)) okMsg += "\n" + r.Output;
+        return Emit(true, okMsg);
     }
 
     private static int CmdStart(OrcaConfig cfg)
@@ -383,6 +423,7 @@ public static class Program
         string.Empty,
         "  /orca 状态        查看服务器、端口与更新状态",
         "  /orca 检查        立即检查更新",
+        "  /orca 更新        拉取官方更新并重新构建（先列出将拉取的提交）",
         "  /orca 启动        启动 DSH 服务器",
         "  /orca 关闭        关闭 DSH 服务器",
         "  /orca 重启        重启 DSH 服务器",
@@ -397,7 +438,7 @@ public static class Program
         "  /orca 安装        打开一键安装向导",
         "  /orca 帮助        显示本帮助",
         string.Empty,
-        "也可用英文：status / check / start / stop / restart / open / log / port / config / health / console / tray / tray-stop / setup / help",
+        "也可用英文：status / check / update / start / stop / restart / open / log / port / config / health / console / tray / tray-stop / setup / help",
     });
 
     // ============================================================

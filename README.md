@@ -2,24 +2,25 @@
 
 🌏 **中文** | [English](README.en.md)
 
-![版本](https://img.shields.io/badge/版本-v2.0.0-36D199) ![平台](https://img.shields.io/badge/平台-Windows-0078D6) ![技术栈](https://img.shields.io/badge/C%23-.NET%208%20WPF-512BD4) ![许可证](https://img.shields.io/badge/许可证-MIT-green)
+![版本](https://img.shields.io/badge/版本-v2.1.0-36D199) ![平台](https://img.shields.io/badge/平台-Windows-0078D6) ![技术栈](https://img.shields.io/badge/C%23-.NET%208%20WPF-512BD4) ![许可证](https://img.shields.io/badge/许可证-MIT-green)
 
 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) 提供更新检查、服务器启停、系统托盘、图形控制台与一键安装引导的 **Cordis 插件 + 原生桌面程序**。
 
-> **v2.0.0 重大更新**：底层从 PowerShell / VBScript 全面重写为 **C# / .NET 8（WPF + WinForms）**，编译为原生 `exe`。功能一个不少，启动更快、状态刷新不卡界面，也不再受 PowerShell 执行策略、脚本编码（BOM/GBK）之类问题的影响。
+> **底层实现**：桌面端为 C# / .NET 8（WPF + WinForms）编译的原生 `exe`（自 v2.0.0 起），而非 PowerShell / VBScript 脚本。启动与状态刷新更快，不受执行策略、脚本编码（BOM/GBK）差异影响。
 
 ## 特性
 
 - **更新检查**：DSH 启动时对比本地 git 提交号与官方 `master` 分支，有更新记日志 + 通知。**只查询，绝不自动更新。**
-- **`/orca` 命令集**：15 个子命令，覆盖状态 / 启停 / 重启 / 日志 / 端口 / 配置 / 诊断 / 托盘 / 控制台 / 安装。
+- **一键更新预览**：控制台「更新 DSH…」先做一次只读 `git fetch`，把即将拉取的提交逐条列在确认框里，已是最新则直接跳过、不做空更新；`/orca 更新` 同样先预览再更新，更新内容一目了然。
+- **`/orca` 命令集**：16 个子命令，覆盖状态 / 启停 / 重启 / 更新 / 日志 / 端口 / 配置 / 诊断 / 托盘 / 控制台 / 安装。
 - **系统托盘**：WinForms `NotifyIcon`，左键打开界面，右键菜单启停服务器、检查更新、打开管理界面。
-- **图形控制台**：WPF 管理窗口（概览 / 服务器 / **安装** / 日志 / 设置 / 关于），深/浅主题 + 6 种强调色，DSH 未启动也能打开。
+- **图形控制台**：WPF 管理窗口（概览 / 服务器 / **安装** / 日志 / 设置 / 关于），深/浅主题 + 6 种强调色，卡片描边/悬停高亮、页面呼吸感、图标徽章状态卡，DSH 未启动也能打开。
 - **一键安装**：控制台「安装」页或独立向导 `orca-setup.exe`（单文件、自包含 .NET 运行时），支持两条路径——
   - 完整版：`git clone` + `pnpm install` + `pnpm run build` + `pnpm dsh web`；
   - 官方 Web 版：`npx @deepseek-ai/dsh web`（只需 Node.js）。
 - **DSH 自动构建保护**：DSH 是源码 checkout，`git pull` 后缺构建产物会启动失败。启动与更新两条路径都会先做构建检查（HEAD 变化或 6 个关键产物缺失才 `pnpm run build`），成功才启动。
 - **端口归属判断**：只在确认占用者是 DSH 时才关闭，**绝不误杀其他 Node 进程**。
-- **计费时段徽标**：DSH 聊天界面顶部实时显示 DeepSeek 峰谷计费状态（北京时间高峰 09:00-12:00、14:00-18:00，高峰价约为空闲时段 2 倍），帮你错峰省钱。
+- **计费时段徽标**：DSH 聊天界面顶部实时显示 DeepSeek 峰谷计费状态（北京时间高峰 09:00-12:00、14:00-18:00，高峰价约为空闲时段 2 倍）。
 
 ## 安装
 
@@ -55,6 +56,7 @@ install.cmd
 |---|---|---|
 | `/orca 状态` | 服务器 / 端口 / 更新 / 托盘状态 | `status` |
 | `/orca 检查` | 立即检查更新 | `check` |
+| `/orca 更新` | 拉取官方更新并重新构建（先列出将拉取的提交） | `update` |
 | `/orca 启动` | 启动 DSH 服务器 | `start` |
 | `/orca 关闭` | 关闭 DSH 服务器（非 DSH 进程不误杀） | `stop` |
 | `/orca 重启` | 一键重启 | `restart` |
@@ -111,11 +113,15 @@ bin\orca.exe --start-server         :: 静默启动 DSH 服务器（开机自启
 
 ![计费时段卡片](shots/billing.png)
 
-*计费时段徽标：实时提示 DeepSeek 峰谷计费状态（高峰/空闲时段、各模型单价），帮您错峰省钱。*
+*计费时段徽标：显示 DeepSeek 峰谷计费状态（高峰/空闲时段、各模型单价）。*
 
-![控制台概览](shots/console.png)
+![控制台概览（深色）](shots/console.png)
 
-*控制台概览：健康检查（DSH 服务器 / 更新检查 / Orca 托盘）一目了然。*
+*控制台概览：健康检查（DSH 服务器 / 更新检查 / Orca 托盘），卡片描边、图标徽章、标题下强调色短横线与侧边栏当前页指示条。*
+
+![控制台概览（浅色）](shots/console-light.png)
+
+*浅色主题：卡片描边、图标徽章、强调色指示条按浅色适配。*
 
 ![一键安装 DSH](shots/install.png)
 
@@ -175,8 +181,8 @@ publish.cmd    :: 打分发包（dist\orca-setup.exe）
 **Orca DSH Launcher 是什么？**
 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH，DeepSeek 开源 AI 智能体框架）打造的 Windows 桌面伴侣与 Cordis 插件：更新检查、服务器启停、系统托盘、图形控制台、一键安装。
 
-**v2.0.0 为什么要换成 C#？**
-原来的桌面端是 PowerShell 脚本，受执行策略限制、脚本编码（BOM/GBK）敏感、界面查询状态时容易卡顿，也不好做成正经的可执行文件。换成 C# / .NET 8 后是编译好的原生程序：启动快、界面流畅、分发省心，功能与旧版一一对齐。
+**为什么用 C# 重写？**
+原来的桌面端是 PowerShell 脚本，受执行策略限制、脚本编码（BOM/GBK）敏感、界面查询状态时容易卡顿，也不便分发。换成 C# / .NET 8 后为编译好的原生程序，启动与界面响应更快、分发更简单，功能与旧版对齐。
 
 **它会自动更新 DSH 吗？**
 不会。只检查并提醒，**绝不自动更新**，也绝不改动 DSH 的任何源码文件。
@@ -190,7 +196,7 @@ Windows 10 / 11。日常使用需要 .NET 8 Desktop Runtime（`orca-setup.exe` �
 **端口冲突怎么办？**
 启动前自动检测端口占用；非 DSH 进程**不会误杀**，并明确提示占用者。
 
-**升级到 v2.0.0 会丢配置吗？**
+**升级会丢失配置吗？**
 不会。配置、统计、日志、更新检查结果都在 `~/.dsh/` 下沿用同名文件；旧的 PowerShell 资产会先备份到 `~/.dsh/orca-backup/` 再清理。
 
 ## 变更记录
@@ -207,4 +213,4 @@ Windows 10 / 11。日常使用需要 .NET 8 Desktop Runtime（`orca-setup.exe` �
 
 ---
 
-**关于虎鲸**：虎鲸（Orca）聪明、优雅、擅长团队协作——这个工具的目标是安静守护你的 DSH，需要时一叫就到。
+**关于命名**：项目名取自虎鲸（Orca）。插件常驻系统托盘，为 DSH 提供更新检查、启停与守护入口。

@@ -46,6 +46,9 @@
     <SolidColorBrush x:Key="ColorTagNeutralBg" Color="#2D2D2D"/>
     <SolidColorBrush x:Key="ColorTagNeutralFg" Color="#9A9A9A"/>
 
+    <!-- 按钮悬停"上浮"阴影（呼吸感；点击/离开自动消失） -->
+    <DropShadowEffect x:Key="BtnLiftShadow" Color="#000000" BlurRadius="12" ShadowDepth="2" Direction="270" Opacity="0.25"/>
+
     <!-- 主按钮：白底黑字（高对比） -->
     <Style x:Key="PrimaryButton" TargetType="Button">
       <Setter Property="Background" Value="{DynamicResource ColorBtnPrimaryBg}"/>
@@ -57,7 +60,7 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -75,6 +78,11 @@
           </ControlTemplate>
         </Setter.Value>
       </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Effect" Value="{StaticResource BtnLiftShadow}"/>
+        </Trigger>
+      </Style.Triggers>
     </Style>
     <!-- 次要按钮：深灰底浅字 -->
     <Style x:Key="SecondaryButton" TargetType="Button">
@@ -86,7 +94,7 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -104,6 +112,11 @@
           </ControlTemplate>
         </Setter.Value>
       </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Effect" Value="{StaticResource BtnLiftShadow}"/>
+        </Trigger>
+      </Style.Triggers>
     </Style>
     <!-- 危险按钮：淡红字（关闭服务器 / 清空日志） -->
     <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
@@ -128,12 +141,18 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
-              <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
+              <Grid>
+                <Rectangle x:Name="ind" Width="3" RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource ColorAccent}" HorizontalAlignment="Left" VerticalAlignment="Stretch" Margin="6,9,0,9" Visibility="Collapsed"/>
+                <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+              </Grid>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource ColorNavHover}"/>
+              </Trigger>
+              <Trigger Property="Tag" Value="active">
+                <Setter TargetName="ind" Property="Visibility" Value="Visible"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -150,7 +169,7 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -179,9 +198,11 @@
     </Style>
     <!-- 状态标签（胶囊） -->
     <Style x:Key="StatusTag" TargetType="Border">
-      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="CornerRadius" Value="11"/>
       <Setter Property="Padding" Value="10,3"/>
       <Setter Property="Background" Value="{DynamicResource ColorTagNeutralBg}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ColorBorder}"/>
+      <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <!-- 强调色色块选择器（设置页外观组） -->
@@ -211,6 +232,29 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <!-- 内容卡片：统一描边 + 悬停微高亮（呼吸感） -->
+    <Style x:Key="Card" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource ColorCard}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ColorBorder}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="14,12"/>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="{DynamicResource ColorCardHover}"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <!-- 页面标题下的强调色短横线（呼吸感） -->
+    <Style x:Key="TitleUnderline" TargetType="Rectangle">
+      <Setter Property="Height" Value="2"/>
+      <Setter Property="Width" Value="44"/>
+      <Setter Property="RadiusX" Value="1"/>
+      <Setter Property="RadiusY" Value="1"/>
+      <Setter Property="Fill" Value="{DynamicResource ColorAccent}"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="Margin" Value="0,10,0,0"/>
+    </Style>
   </Window.Resources>
 
   <!-- 外层圆角主容器 -->
@@ -231,6 +275,7 @@
           <Button x:Name="btnMin" Content="—" Style="{StaticResource WindowButton}" Width="34" Height="26"/>
           <Button x:Name="btnClose" Content="✕" Style="{StaticResource WindowButton}" Width="34" Height="26" Margin="4,0,0,0"/>
         </StackPanel>
+        <Rectangle Height="1" Fill="{DynamicResource ColorBorder}" VerticalAlignment="Bottom" HorizontalAlignment="Stretch"/>
       </Grid>
 
       <!-- ═══ 主体：侧边栏 + 内容区 ═══ -->
@@ -256,7 +301,7 @@
               <Button x:Name="navSettings" Style="{StaticResource NavButton}" Content="⚙️  设置"/>
               <Button x:Name="navAbout"    Style="{StaticResource NavButton}" Content="ℹ️  关于"/>
             </StackPanel>
-            <TextBlock x:Name="lblVer" Grid.Row="1" Text="v2.0.0" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="20,0,0,14"/>
+            <TextBlock x:Name="lblVer" Grid.Row="1" Text="v2.1.0" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="20,0,0,14"/>
           </Grid>
         </Border>
 
@@ -274,19 +319,22 @@
             <StackPanel x:Name="pageOverview" CacheMode="BitmapCache">
               <TextBlock Text="概览" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
               <TextBlock Text="检查问题、启动与快速修复" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
-              <TextBlock Text="健康检查" FontSize="14" Foreground="{DynamicResource ColorTextPrimary}" Margin="0,18,0,0"/>
+              <Rectangle Style="{StaticResource TitleUnderline}"/>
+              <TextBlock Text="健康检查" FontSize="14" Foreground="{DynamicResource ColorAccent}" FontWeight="SemiBold" Margin="0,18,0,0"/>
               <TextBlock Text="概览只展示关键状态，具体配置在设置页处理" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,2,0,0"/>
 
               <StackPanel Margin="0,12,0,0">
                 <!-- 卡片1：DSH 服务器 -->
-                <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="14,12" Margin="0,0,0,8">
+                <Border Style="{StaticResource Card}" Padding="14,12" Margin="0,0,0,8">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="Auto"/>
                       <ColumnDefinition Width="*"/>
                       <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="✓" FontSize="16" Foreground="{DynamicResource ColorAccent}" VerticalAlignment="Center"/>
+                    <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9" Background="{DynamicResource ColorTagNeutralBg}" VerticalAlignment="Center">
+                      <TextBlock Text="✓" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                       <TextBlock Text="DSH 服务器" FontSize="13" Foreground="{DynamicResource ColorTextPrimary}"/>
                       <TextBlock x:Name="cardServerSub" Text="http://127.0.0.1:3080" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,2,0,0"/>
@@ -297,14 +345,16 @@
                   </Grid>
                 </Border>
                 <!-- 卡片2：更新检查 -->
-                <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="14,12" Margin="0,0,0,8">
+                <Border Style="{StaticResource Card}" Padding="14,12" Margin="0,0,0,8">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="Auto"/>
                       <ColumnDefinition Width="*"/>
                       <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="✓" FontSize="16" Foreground="{DynamicResource ColorAccent}" VerticalAlignment="Center"/>
+                    <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9" Background="{DynamicResource ColorTagNeutralBg}" VerticalAlignment="Center">
+                      <TextBlock Text="✓" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                       <TextBlock Text="更新检查" FontSize="13" Foreground="{DynamicResource ColorTextPrimary}"/>
                       <TextBlock x:Name="cardUpdateSub" Text="版本 —" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
@@ -315,7 +365,7 @@
                   </Grid>
                 </Border>
                 <!-- 卡片3：Orca 托盘 -->
-                <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="14,12" Margin="0,0,0,8">
+                <Border Style="{StaticResource Card}" Padding="14,12" Margin="0,0,0,8">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="Auto"/>
@@ -323,7 +373,9 @@
                       <ColumnDefinition Width="Auto"/>
                       <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="✓" FontSize="16" Foreground="{DynamicResource ColorAccent}" VerticalAlignment="Center"/>
+                    <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9" Background="{DynamicResource ColorTagNeutralBg}" VerticalAlignment="Center">
+                      <TextBlock Text="✓" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                       <TextBlock Text="Orca 托盘" FontSize="13" Foreground="{DynamicResource ColorTextPrimary}"/>
                       <TextBlock Text="右下角虎鲸图标" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,2,0,0"/>
@@ -348,9 +400,10 @@
             <StackPanel x:Name="pageServer" CacheMode="BitmapCache" Visibility="Collapsed">
               <TextBlock Text="服务器" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
               <TextBlock Text="启动、关闭、重启与打开 DSH 界面" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
-              <TextBlock Text="最近状态" FontSize="14" Foreground="{DynamicResource ColorTextPrimary}" Margin="0,18,0,0"/>
+              <Rectangle Style="{StaticResource TitleUnderline}"/>
+              <TextBlock Text="最近状态" FontSize="14" Foreground="{DynamicResource ColorAccent}" FontWeight="SemiBold" Margin="0,18,0,0"/>
 
-              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,12" Margin="0,10,0,0">
+              <Border Style="{StaticResource Card}" Padding="16,12" Margin="0,10,0,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="110"/>
@@ -388,16 +441,19 @@
             <StackPanel x:Name="pageInstall" CacheMode="BitmapCache" Visibility="Collapsed">
               <TextBlock Text="安装 DSH" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
               <TextBlock Text="电脑上还没有 DSH？这里一键搞定，两条路任选" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
+              <Rectangle Style="{StaticResource TitleUnderline}"/>
 
-              <TextBlock Text="安装状态" FontSize="14" Foreground="{DynamicResource ColorTextPrimary}" Margin="0,18,0,0"/>
-              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,12" Margin="0,8,0,0">
+              <TextBlock Text="安装状态" FontSize="14" Foreground="{DynamicResource ColorAccent}" FontWeight="SemiBold" Margin="0,18,0,0"/>
+              <Border Style="{StaticResource Card}" Padding="16,12" Margin="0,8,0,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
-                  <TextBlock x:Name="installCardIcon" Text="○" FontSize="16" Foreground="{DynamicResource ColorTextMuted}" VerticalAlignment="Center"/>
+                  <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9" Background="{DynamicResource ColorTagNeutralBg}" VerticalAlignment="Center">
+                    <TextBlock x:Name="installCardIcon" Text="○" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource ColorTextMuted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  </Border>
                   <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="DSH 完整版" FontSize="13" Foreground="{DynamicResource ColorTextPrimary}"/>
                     <TextBlock x:Name="installCardSub" Text="检测中…" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
@@ -417,7 +473,7 @@
 
               <TextBlock x:Name="installStatus" Text="" FontSize="12" Foreground="{DynamicResource ColorAccent}" Margin="0,12,0,0" TextWrapping="Wrap"/>
               <TextBox x:Name="txtInstallLog" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
-                       Background="#12141C" Foreground="#D0D7E5" BorderBrush="#2A2D42" BorderThickness="1"
+                       Background="{DynamicResource ColorInput}" Foreground="{DynamicResource ColorTextPrimary}" BorderBrush="{DynamicResource ColorInputBorder}" BorderThickness="1"
                        Padding="10,8" TextWrapping="NoWrap" AcceptsReturn="True"
                        VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                        Height="160" Margin="0,10,0,0" Visibility="Collapsed"/>
@@ -430,8 +486,9 @@
             <StackPanel x:Name="pageLogs" CacheMode="BitmapCache" Visibility="Collapsed">
               <TextBlock Text="日志" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
               <TextBlock Text="DSH 服务器运行日志（存于 ~/.dsh/orca-dsh-server.log）" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
+              <Rectangle Style="{StaticResource TitleUnderline}"/>
               <TextBox x:Name="txtLog" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
-                       Background="#12141C" Foreground="#D0D7E5" BorderBrush="#2A2D42" BorderThickness="1"
+                       Background="{DynamicResource ColorInput}" Foreground="{DynamicResource ColorTextPrimary}" BorderBrush="{DynamicResource ColorInputBorder}" BorderThickness="1"
                        Padding="10,8" TextWrapping="NoWrap" AcceptsReturn="True"
                        VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                        Height="330" Margin="0,14,0,0"/>
@@ -447,9 +504,10 @@
                 <StackPanel>
                   <TextBlock Text="设置" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
                   <TextBlock Text="修改后点保存，立即生效" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,2,0,0"/>
+                  <Rectangle Style="{StaticResource TitleUnderline}"/>
 
                   <!-- 基本设置 -->
-                  <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,16,0,0">
+                  <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,16,0,0">
                     <StackPanel>
                       <TextBlock Text="基本设置" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" Margin="0,0,0,12"/>
                       <Grid>
@@ -471,7 +529,7 @@
                   </Border>
 
                   <!-- 开机自启 -->
-                  <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,10,0,0">
+                  <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,10,0,0">
                     <StackPanel>
                       <TextBlock Text="开机自启" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" Margin="0,0,0,10"/>
                       <CheckBox x:Name="chkStartup" Content="开机自启托盘（Windows 登录时）" Foreground="{DynamicResource ColorTextSecondary}" FontSize="12" Margin="0,3,0,3"/>
@@ -481,7 +539,7 @@
                   </Border>
 
                   <!-- 外观 -->
-                  <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,10,0,0">
+                  <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,10,0,0">
                     <StackPanel>
                       <TextBlock Text="外观" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}" Margin="0,0,0,12"/>
                       <Grid>
@@ -520,11 +578,12 @@
             <!-- ═══ 关于页 ═══ -->
             <StackPanel x:Name="pageAbout" CacheMode="BitmapCache" Visibility="Collapsed">
               <TextBlock Text="关于" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
-              <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="20,20" Margin="0,16,0,0">
+              <Rectangle Style="{StaticResource TitleUnderline}"/>
+              <Border Style="{StaticResource Card}" Padding="20,20" Margin="0,16,0,0">
                 <StackPanel HorizontalAlignment="Center">
                   <TextBlock Text="🐋" FontSize="40" HorizontalAlignment="Center"/>
                   <TextBlock Text="Orca DSH Launcher" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
-                  <TextBlock x:Name="lblVerAbout" Text="版本 v2.0.0" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                  <TextBlock x:Name="lblVerAbout" Text="版本 v2.1.0" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                   <TextBlock Text="DSH 守护者：更新检查 · 服务器启停 · 托盘 · 控制台" FontSize="12" Foreground="{DynamicResource ColorTextMuted}" HorizontalAlignment="Center" Margin="0,14,0,0" TextWrapping="Wrap"/>
                   <TextBlock x:Name="lblStats" Text="🐋 正在计算使用统计…" FontSize="11" Foreground="{DynamicResource ColorAccent}" HorizontalAlignment="Center" Margin="0,10,0,0" TextWrapping="Wrap"/>
                   <TextBlock x:Name="lblRuntime" Text="" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap"/>

@@ -192,6 +192,56 @@ public static class DshServer
     }
 
     /// <summary>
+    /// 生成"更新内容预览"：在真正 git pull 之前，先让用户看看会拉进来哪些提交。
+    /// 只做 git fetch（把远端引用拉下来用于对比），不改工作区、不合并、不停服务器，
+    /// 纯只读预览。网络不通 / 不是 git 仓库时返回 Ok=false，调用方降级提示。
+    /// </summary>
+    /// <param name="cfg">配置。</param>
+    /// <param name="maxCommits">最多列出多少条提交标题。</param>
+    public static UpdatePreview PreviewUpdate(OrcaConfig cfg, int maxCommits = 10)
+    {
+        try
+        {
+            // 1) 拉一次远端引用，供对比（安全：仅更新 .git 引用，不动工作区）
+            var fetch = ProcessRunner.Run("git", new[] { "-C", cfg.DshDir, "fetch", "--quiet" }, 60000);
+            if (!fetch.Ok)
+            {
+                var reason = string.IsNullOrWhiteSpace(fetch.StdErr) ? "git fetch 失败" : fetch.StdErr;
+                return new UpdatePreview { Ok = false, Error = reason };
+            }
+
+            // 2) 找当前分支的上游引用（git pull 实际就是合并 @{u}；找不到就退回 origin/<branch>）
+            var upstream = ProcessRunner.Run("git", new[] { "-C", cfg.DshDir, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}" }, 10000);
+            var refName = upstream.Ok && !string.IsNullOrWhiteSpace(upstream.StdOut.Trim())
+                ? upstream.StdOut.Trim()
+                : "origin/" + cfg.Branch;
+
+            // 3) 统计并列出将要合并进来的提交（HEAD..上游就是 pull 会带来的内容）
+            var count = ProcessRunner.Run("git", new[] { "-C", cfg.DshDir, "rev-list", "--count", "HEAD.." + refName }, 20000);
+            int incoming = 0;
+            if (count.Ok && int.TryParse(count.StdOut.Trim(), out var n)) incoming = n;
+
+            if (incoming <= 0)
+            {
+                return new UpdatePreview { Ok = true, IncomingCount = 0 };
+            }
+
+            var log = ProcessRunner.Run("git", new[] { "-C", cfg.DshDir, "log", "--oneline", "--max-count=" + maxCommits, "HEAD.." + refName }, 20000);
+            var commits = (log.Ok ? log.StdOut : string.Empty)
+                .Split('\n')
+                .Select(l => l.Trim())
+                .Where(l => l.Length > 0)
+                .ToArray();
+
+            return new UpdatePreview { Ok = true, IncomingCount = incoming, Commits = commits };
+        }
+        catch (Exception ex)
+        {
+            return new UpdatePreview { Ok = false, Error = ex.Message };
+        }
+    }
+
+    /// <summary>
     /// 打开 DSH 界面：
     ///   1. 未运行 → 先启动服务器
     ///   2. 等待就绪（默认最多 60 秒；刚更新过要构建时可以传更长）
@@ -271,4 +321,20 @@ public static class DshServer
         }
         return false;
     }
+}
+
+/// <summary>一次"更新内容预览"的结果（在真正 git pull 之前先给用户看）。</summary>
+public sealed class UpdatePreview
+{
+    /// <summary>能否生成预览（git fetch 是否成功 / 仓库是否可读）。</summary>
+    public bool Ok { get; init; }
+
+    /// <summary>失败原因（Ok=false 时）。</summary>
+    public string? Error { get; init; }
+
+    /// <summary>将要拉取的提交数（0 = 已是最新）。</summary>
+    public int IncomingCount { get; init; }
+
+    /// <summary>提交标题列表（oneline，最多显示 maxCommits 条；IncomingCount 为 0 时为空）。</summary>
+    public string[]? Commits { get; init; }
 }

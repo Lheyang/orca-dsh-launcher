@@ -36,19 +36,19 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="#FFFFFF"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ColorBtnPrimaryHover}"/>
               </Trigger>
               <Trigger Property="IsPressed" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="#D8D8D8"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ColorBtnPrimaryPressed}"/>
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
-                <Setter TargetName="bd" Property="Background" Value="#1E1E1E"/>
-                <Setter Property="Foreground" Value="#555555"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ColorBtnDisabledBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource ColorBtnDisabledFg}"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -64,16 +64,16 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="#3A3A3A"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ColorBtnSecondaryHover}"/>
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
-                <Setter TargetName="bd" Property="Background" Value="#1E1E1E"/>
-                <Setter Property="Foreground" Value="#555555"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ColorBtnDisabledBg}"/>
+                <Setter Property="Foreground" Value="{DynamicResource ColorBtnDisabledFg}"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -82,24 +82,47 @@
     </Style>
     <Style x:Key="WindowButton" TargetType="Button">
       <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="Foreground" Value="#9AA0B5"/>
+      <Setter Property="Foreground" Value="{DynamicResource ColorWindowBtnFg}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="bd" Property="Background" Value="#2A2A2A"/>
+                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ColorWindowBtnHoverBg}"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
       </Setter>
+    </Style>
+    <!-- 内容卡片：统一描边 + 悬停微高亮（与控制台一致） -->
+    <Style x:Key="Card" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource ColorCard}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource ColorBorder}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="16,14"/>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="{DynamicResource ColorCardHover}"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <!-- 标题下短横线（呼吸感） -->
+    <Style x:Key="TitleUnderline" TargetType="Rectangle">
+      <Setter Property="Height" Value="2"/>
+      <Setter Property="Width" Value="44"/>
+      <Setter Property="RadiusX" Value="1"/>
+      <Setter Property="RadiusY" Value="1"/>
+      <Setter Property="Fill" Value="{DynamicResource ColorAccent}"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="Margin" Value="0,10,0,0"/>
     </Style>
   </Window.Resources>
 
@@ -147,7 +170,8 @@
           <StackPanel x:Name="pageWelcome">
             <TextBlock Text="欢迎使用 Orca DSH Launcher" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
             <TextBlock Text="帮你在一台电脑上，从零装好 DeepSeek Harness（DSH）" FontSize="13" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,8,0,0" TextWrapping="Wrap"/>
-            <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,20,0,0">
+            <Rectangle Style="{StaticResource TitleUnderline}"/>
+            <Border Style="{StaticResource Card}" Margin="0,20,0,0">
               <StackPanel>
                 <TextBlock Text="这个向导会帮你完成：" FontSize="13" Foreground="{DynamicResource ColorTextPrimary}"/>
                 <TextBlock Text="① 检查电脑环境（缺什么会告诉你去哪装）" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,8,0,0"/>
@@ -167,7 +191,7 @@
           <StackPanel x:Name="pageEnv" Visibility="Collapsed">
             <TextBlock Text="检查电脑环境" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
             <TextBlock Text="安装 DSH 需要 Node.js、Git 和 pnpm，缺哪个装哪个" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,6,0,0"/>
-            <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,18,0,0">
+            <Border Style="{StaticResource Card}" Margin="0,18,0,0">
               <StackPanel>
                 <Grid>
                   <Grid.ColumnDefinitions>
@@ -212,7 +236,7 @@
           <StackPanel x:Name="pageNet" Visibility="Collapsed">
             <TextBlock Text="检查网络" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
             <TextBlock Text="下载 DSH 需要能访问 GitHub，先测一下" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,6,0,0"/>
-            <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,18,0,0">
+            <Border Style="{StaticResource Card}" Margin="0,18,0,0">
               <StackPanel>
                 <Grid>
                   <Grid.ColumnDefinitions>
@@ -236,7 +260,7 @@
           <StackPanel x:Name="pageDir" Visibility="Collapsed">
             <TextBlock Text="选择安装位置" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}"/>
             <TextBlock Text="DSH 会被装到你选的文件夹里（会自动创建一个 deepseek-harness 子文件夹）" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-            <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,18,0,0">
+            <Border Style="{StaticResource Card}" Margin="0,18,0,0">
               <StackPanel>
                 <TextBlock Text="安装位置" FontSize="12" Foreground="{DynamicResource ColorTextMuted}"/>
                 <Grid Margin="0,8,0,0">
@@ -244,7 +268,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
-                  <Border Background="#1E1E1E" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                  <Border Background="{DynamicResource ColorInput}" BorderBrush="{DynamicResource ColorInputBorder}" BorderThickness="1" CornerRadius="6" Padding="10,8">
                     <TextBlock x:Name="dirPath" Text="（还没有选择）" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" TextTrimming="CharacterEllipsis"/>
                   </Border>
                   <Button x:Name="btnBrowse" Grid.Column="1" Content="选择文件夹…" Style="{StaticResource SecondaryButton}" Width="120" Height="32" Margin="10,0,0,0"/>
@@ -278,7 +302,7 @@
           <StackPanel x:Name="pageDone" Visibility="Collapsed">
             <TextBlock Text="🎉 安装完成！" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource ColorAccent}"/>
             <TextBlock x:Name="doneSummary" Text="" FontSize="13" Foreground="{DynamicResource ColorTextSecondary}" Margin="0,10,0,0" TextWrapping="Wrap"/>
-            <Border CornerRadius="6" Background="{DynamicResource ColorCard}" Padding="16,14" Margin="0,18,0,0">
+            <Border Style="{StaticResource Card}" Margin="0,18,0,0">
               <StackPanel>
                 <TextBlock x:Name="doneDetail" Text="" FontSize="12" Foreground="{DynamicResource ColorTextPrimary}" TextWrapping="Wrap"/>
               </StackPanel>

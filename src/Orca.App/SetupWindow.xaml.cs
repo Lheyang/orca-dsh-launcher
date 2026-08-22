@@ -42,7 +42,7 @@ public partial class SetupWindow : Window
                 imgLogo.Source = logo;
                 Icon = logo;
             }
-            ThemeApplier.Apply(this, isDark: true, AccentPresets.Current());
+            ThemeApplier.Apply(this, OrcaConfig.Load().IsDark, AccentPresets.Current());
             ShowPage("welcome");
             lblStatus.Text = "欢迎使用";
         };

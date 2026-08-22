@@ -305,6 +305,7 @@ public partial class ConsoleWindow : Window
             kv.Value.Background = active ? selBg : Brushes.Transparent;
             kv.Value.Foreground = active ? fgPrimary : fgSecondary;
             kv.Value.FontWeight = active ? FontWeights.Bold : FontWeights.Normal;
+            kv.Value.Tag = active ? "active" : null;
         }
 
         if (name == "logs") UpdateLogDisplay();
@@ -676,15 +677,47 @@ public partial class ConsoleWindow : Window
     {
         try
         {
-            var confirm = OrcaDialog.Show(this, "更新 DSH",
-                $"即将更新 DSH 本体（在 {_cfg.DshDir} 执行 git pull）。\n更新后需要重启 DSH 才能生效。\n继续吗？",
-                OrcaDialogType.Question, OrcaDialogButtons.YesNo);
-            if (!confirm) return;
-
             btnUpdateDsh.IsEnabled = false;
-            lblStatus.Text = "正在更新 DSH…（git pull + 必要时重新构建，可能需要几分钟）";
+            lblStatus.Text = "正在获取更新预览…";
 
             var cfg = _cfg;
+            var preview = await Task.Run(() => DshServer.PreviewUpdate(cfg));
+
+            // 已是最新：直接提示，不必执行 pull
+            if (preview.Ok && preview.IncomingCount == 0)
+            {
+                lblStatus.Text = "当前已是最新版本，无需更新";
+                OrcaDialog.Show(this, "无需更新", "当前 DSH 已是最新版本，无需更新。", OrcaDialogType.Info, OrcaDialogButtons.Ok);
+                return;
+            }
+
+            // 组装确认框正文：把即将拉取的提交列给用户看（预览更新内容）
+            var body = $"即将更新 DSH 本体（在 {cfg.DshDir} 执行 git pull）。\n更新后需要重启 DSH 才能生效。";
+            if (preview.Ok && preview.IncomingCount > 0)
+            {
+                body += $"\n\n本次将拉取 {preview.IncomingCount} 个新提交：";
+                var commits = preview.Commits ?? Array.Empty<string>();
+                foreach (var c in commits) body += "\n· " + c;
+                if (preview.IncomingCount > commits.Length)
+                {
+                    body += $"\n…（共 {preview.IncomingCount} 个，完整内容见更新后日志）";
+                }
+            }
+            else if (!preview.Ok)
+            {
+                body += $"\n\n（无法获取更新预览：{preview.Error}。点「是」仍将继续更新。）";
+            }
+            body += "\n\n继续吗？";
+
+            var confirm = OrcaDialog.Show(this, "更新 DSH", body, OrcaDialogType.Question, OrcaDialogButtons.YesNo);
+            if (!confirm)
+            {
+                lblStatus.Text = "已取消更新";
+                return;
+            }
+
+            lblStatus.Text = "正在更新 DSH…（git pull + 必要时重新构建，可能需要几分钟）";
+
             var result = await Task.Run(() => DshServer.UpdateDsh(cfg));
             if (result.Ok)
             {
