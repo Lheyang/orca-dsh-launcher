@@ -22,7 +22,7 @@
     <PlatformTarget>x64</PlatformTarget>
 
     <!-- 版本信息（显示在 exe 属性、关于页、托盘菜单） -->
-    <Version Condition="'$(Version)' == ''">2.1.0</Version>
+    <Version Condition="'$(Version)' == ''">2.1.1</Version>
     <Company>Orca DSH Launcher</Company>
     <Product>Orca DSH Launcher</Product>
     <Copyright>MIT License</Copyright>
