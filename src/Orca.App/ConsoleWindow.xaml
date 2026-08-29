@@ -301,7 +301,7 @@
               <Button x:Name="navSettings" Style="{StaticResource NavButton}" Content="⚙️  设置"/>
               <Button x:Name="navAbout"    Style="{StaticResource NavButton}" Content="ℹ️  关于"/>
             </StackPanel>
-            <TextBlock x:Name="lblVer" Grid.Row="1" Text="v2.1.1" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="20,0,0,14"/>
+            <TextBlock x:Name="lblVer" Grid.Row="1" Text="v2.1.2" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" Margin="20,0,0,14"/>
           </Grid>
         </Border>
 
@@ -583,7 +583,7 @@
                 <StackPanel HorizontalAlignment="Center">
                   <TextBlock Text="🐋" FontSize="40" HorizontalAlignment="Center"/>
                   <TextBlock Text="Orca DSH Launcher" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource ColorTextPrimary}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
-                  <TextBlock x:Name="lblVerAbout" Text="版本 v2.1.1" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                  <TextBlock x:Name="lblVerAbout" Text="版本 v2.1.2" FontSize="12" Foreground="{DynamicResource ColorTextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                   <TextBlock Text="DSH 守护者：更新检查 · 服务器启停 · 托盘 · 控制台" FontSize="12" Foreground="{DynamicResource ColorTextMuted}" HorizontalAlignment="Center" Margin="0,14,0,0" TextWrapping="Wrap"/>
                   <TextBlock x:Name="lblStats" Text="🐋 正在计算使用统计…" FontSize="11" Foreground="{DynamicResource ColorAccent}" HorizontalAlignment="Center" Margin="0,10,0,0" TextWrapping="Wrap"/>
                   <TextBlock x:Name="lblRuntime" Text="" FontSize="11" Foreground="{DynamicResource ColorTextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0" TextWrapping="Wrap"/>

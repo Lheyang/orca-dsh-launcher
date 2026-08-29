@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+## [v2.1.2] - 2026-08-30
+
+### Fixed
+- **DSH 构建失败自动清理并重建**：构建失败时自动先 `pnpm clean`（清理上游删包残留的未追踪旧产物，避免 `MISSING_EXPORT`）再 `pnpm run build`，成功才放行。
+- **启动 DSH 放宽 corepack 校验**：启动进程设 `COREPACK_ENABLE_STRICT=0`，避免 `packageManager` 固定 pnpm 版本的签名校验网络超时导致 `Refusing to run`、启动/构建被卡死。
+
 ## [v2.1.1] - 2026-08-23
 
 ### Fixed
