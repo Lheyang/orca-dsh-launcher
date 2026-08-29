@@ -64,6 +64,11 @@ public static class ProcessRunner
             {
                 psi.WorkingDirectory = workingDirectory;
             }
+            // 关闭 corepack 的严格校验：DSH 的 package.json 声明了固定 pnpm 版本，
+            // 若 registry 的签名校验网络超时会 "Refusing to run pnpm@X"，导致启动/
+            // 构建被卡死。COREPACK_ENABLE_STRICT=0 让它用本机已有 pnpm、跳过严格
+            // 签名校验，保证能起来（签名问题只警告，不中断）。
+            psi.Environment["COREPACK_ENABLE_STRICT"] = "0";
             return Process.Start(psi);
         }
         catch

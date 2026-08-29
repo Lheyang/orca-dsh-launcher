@@ -141,9 +141,44 @@ public static class DshBuild
         if (!need) return OpResult.Success();
 
         var r = RunBuild(dshDir);
-        if (!r.Ok) return r;
+        if (!r.Ok)
+        {
+            // 构建失败：可能是上游删除了 packages/ 下的包，git pull 不会清理其
+            // 残留的旧构建产物（lib/、node_modules/，不受 git 追踪），导致
+            // MISSING_EXPORT 一类错误。先 pnpm clean 清掉旧产物，再全量重建一次。
+            var r2 = RebuildAfterClean(dshDir);
+            if (!r2.Ok) return r2;
+
+            SetLastBuiltCommit(head);
+            return OpResult.Success(rebuilt: true);
+        }
 
         SetLastBuiltCommit(head);
         return OpResult.Success(rebuilt: true);
+    }
+
+    /// <summary>
+    /// 清理旧构建产物后重新全量构建（pnpm clean → pnpm run build）。
+    /// 用于上游删除包、git pull 残留未追踪旧产物导致构建失败时的兜底。
+    /// </summary>
+    public static OpResult RebuildAfterClean(string dshDir)
+    {
+        // 先 pnpm clean 清掉旧产物；失败也继续，保证后面的 build 有机会成功
+        try
+        {
+            var clean = ProcessRunner.StartHiddenCmdToLog("pnpm.cmd clean", OrcaPaths.BuildLogFile, dshDir);
+            if (clean != null)
+            {
+                using (clean)
+                {
+                    clean.WaitForExit(5 * 60 * 1000);
+                }
+            }
+        }
+        catch
+        {
+            // clean 失败不阻塞重建
+        }
+        return RunBuild(dshDir);
     }
 }
